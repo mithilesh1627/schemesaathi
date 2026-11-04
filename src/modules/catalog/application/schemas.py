@@ -6,6 +6,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.modules.catalog.domain.enums import (
+    PortalType,
     PortalWindowStatus,
     SchemeLevel,
     VerificationStatus,
@@ -54,8 +55,75 @@ class SchemeSummaryResponse(BaseModel):
     income_ceiling_annual_inr: float | None = None
 
 
+class EligibilityRuleDetailResponse(BaseModel):
+    """Statutory eligibility rule parameters and AST logic."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    rule_id: uuid.UUID
+    income_ceiling_annual_inr: float | None = None
+    minimum_qualifying_marks_percent: float | None = None
+    target_categories: list[str] = []
+    eligible_genders: list[str] = []
+    eligible_domiciles: list[str] = []
+    eligible_course_levels: list[str] = []
+    mandates_aishe_institution: bool = True
+    permits_distance_learning: bool = False
+    rule_description_en: str
+    rule_description_mni: str | None = None
+
+
+class ApplicationWindowDetailResponse(BaseModel):
+    """Application portal lifecycle and timeline parameters."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    window_id: uuid.UUID
+    portal_type: PortalType
+    portal_url: str
+    portal_status: PortalWindowStatus
+    window_open_date: date | None = None
+    window_close_date: date | None = None
+    defect_verification_close_date: date | None = None
+    institute_verification_close_date: date | None = None
+    requires_otr_face_rd: bool = False
+    requires_freeship_card: bool = False
+    status_last_verified_at: datetime
+
+
+class BenefitDetailResponse(BaseModel):
+    """Financial allowance and academic aid details."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    benefit_id: uuid.UUID
+    maintenance_allowance_day_scholar_annual_inr: float | None = None
+    maintenance_allowance_hosteller_annual_inr: float | None = None
+    tuition_fee_coverage_desc: str
+    book_and_equipment_grant_annual_inr: float | None = None
+    disbursement_mechanism: str
+    benefit_summary_en: str
+    benefit_summary_hi: str | None = None
+    benefit_summary_mni: str | None = None
+
+
+class MandatoryDocumentDetailResponse(BaseModel):
+    """Required verification document checklist rule."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    doc_id: uuid.UUID
+    document_code: str
+    document_name_en: str
+    document_name_mni: str | None = None
+    issuing_authority_rule: str
+    is_mandatory: bool
+    validity_duration_months: int | None = None
+    critical_validation_notes: str | None = None
+
+
 class SchemeVersionResponse(BaseModel):
-    """Scheme version detail."""
+    """Scheme version detail with optional nested statutory components."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -67,6 +135,10 @@ class SchemeVersionResponse(BaseModel):
     content_sha256: str
     verification_status: VerificationStatus
     verification_notes: str | None = None
+    eligibility_rule: EligibilityRuleDetailResponse | None = None
+    application_window: ApplicationWindowDetailResponse | None = None
+    benefit: BenefitDetailResponse | None = None
+    mandatory_documents: list[MandatoryDocumentDetailResponse] = []
 
 
 class SchemeDetailResponse(SchemeBase):

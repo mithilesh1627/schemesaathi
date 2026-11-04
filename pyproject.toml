@@ -81,6 +81,10 @@ module = [
 ]
 ignore_missing_imports = true
 
+[tool.coverage.run]
+branch = false
+concurrency = ["thread", "greenlet"]
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = "-ra -q --cov=src --cov-report=term-missing"

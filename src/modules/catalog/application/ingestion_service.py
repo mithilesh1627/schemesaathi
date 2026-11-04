@@ -35,7 +35,7 @@ class IngestionService:
         """Ingest a policy document with SHA-256 deduplication guardrails."""
         # 1. Decode base64 document content
         try:
-            raw_bytes = base64.b64decode(request.document_content_base64)
+            raw_bytes = base64.b64decode(request.document_content_base64, validate=True)
         except Exception as exc:
             raise InvalidStateError(
                 message="Failed to decode document_content_base64. Must be valid base64 string.",

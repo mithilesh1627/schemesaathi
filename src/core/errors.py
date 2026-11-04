@@ -84,7 +84,7 @@ class StatutoryRuleValidationError(SchemeSaathiError):
         super().__init__(
             message=message,
             error_code="ERR_STATUTORY_RULE_INVALID",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             details=details,
         )
 
@@ -143,7 +143,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         logger.warning("Request schema validation failed: %s", exc.errors())
         return build_error_response(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             error_code="ERR_VALIDATION_FAILED",
             message="Request parameters or body failed schema validation.",
             details=exc.errors(),

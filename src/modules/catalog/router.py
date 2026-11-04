@@ -17,7 +17,7 @@ from src.modules.catalog.application.schemas import (
     SourceRegistryResponse,
 )
 from src.modules.catalog.application.source_registry_service import SourceRegistryService
-from src.modules.catalog.domain.enums import SchemeLevel
+from src.modules.catalog.domain.enums import PortalWindowStatus, SchemeLevel
 from src.modules.catalog.domain.models import Scheme
 from src.modules.catalog.infrastructure.repositories import SchemeRepository
 
@@ -36,6 +36,18 @@ async def get_schemes_catalog(
         default=None, description="Filter by statutory level"
     ),
     is_active: bool | None = Query(default=True, description="Filter active status"),
+    category: str | None = Query(
+        default=None, description="Filter by social category (e.g. ST, SC, OBC, GENERAL)"
+    ),
+    domicile: str | None = Query(
+        default=None, description="Filter by state domicile (e.g. MANIPUR)"
+    ),
+    course_level: str | None = Query(
+        default=None, description="Filter by course level (e.g. UNDERGRADUATE, POSTGRADUATE)"
+    ),
+    portal_status: PortalWindowStatus | None = Query(
+        default=None, description="Filter by application portal window status"
+    ),
     db: AsyncSession = Depends(get_db_session),
 ) -> PaginatedSchemesResponse:
     """Retrieve catalog of schemes with optional filtering and pagination."""
@@ -46,11 +58,29 @@ async def get_schemes_catalog(
         limit=limit,
         issuing_level=issuing_level,
         is_active=is_active,
+        category=category,
+        domicile=domicile,
+        course_level=course_level,
+        portal_status=portal_status,
     )
 
     items: list[SchemeSummaryResponse] = []
     for s in schemes:
         latest_ver = max(s.versions, key=lambda v: v.version_number) if s.versions else None
+        p_status = (
+            latest_ver.application_window.portal_status
+            if (latest_ver and latest_ver.application_window)
+            else None
+        )
+        inc_ceiling = (
+            float(latest_ver.eligibility_rule.income_ceiling_annual_inr)
+            if (
+                latest_ver
+                and latest_ver.eligibility_rule
+                and latest_ver.eligibility_rule.income_ceiling_annual_inr is not None
+            )
+            else None
+        )
         items.append(
             SchemeSummaryResponse(
                 scheme_id=s.scheme_id,
@@ -61,8 +91,8 @@ async def get_schemes_catalog(
                 ministry_or_department=s.ministry_or_department,
                 is_active=s.is_active,
                 latest_academic_year=latest_ver.academic_year if latest_ver else None,
-                portal_status=None,
-                income_ceiling_annual_inr=None,
+                portal_status=p_status,
+                income_ceiling_annual_inr=inc_ceiling,
             )
         )
 
