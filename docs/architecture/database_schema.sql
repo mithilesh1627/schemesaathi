@@ -212,10 +212,14 @@ CREATE TABLE scheme_knowledge_chunks (
     language_code VARCHAR(16) NOT NULL DEFAULT 'en', -- 'en', 'hi', 'mni_beng', 'mni_latn'
     section_title TEXT NOT NULL,
     page_number INTEGER,
+    chunk_index INTEGER NOT NULL DEFAULT 0,
     chunk_content TEXT NOT NULL,
     token_count INTEGER NOT NULL,
     -- 1536-dimensional dense vector embeddings (Compatible with OpenAI / Indic-BGE)
     embedding vector(1536),
+    embedding_model VARCHAR(64) NOT NULL DEFAULT 'text-embedding-3-small',
+    embedding_dimension INTEGER NOT NULL DEFAULT 1536,
+    model_version VARCHAR(32) NOT NULL DEFAULT 'v1',
     content_sha256 CHAR(64) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

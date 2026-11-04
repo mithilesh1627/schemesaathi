@@ -387,9 +387,15 @@ class SchemeKnowledgeChunk(Base):
     language_code: Mapped[str] = mapped_column(String(16), default="en", nullable=False)
     section_title: Mapped[str] = mapped_column(Text, nullable=False)
     page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    chunk_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     chunk_content: Mapped[str] = mapped_column(Text, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, nullable=False)
     embedding: Mapped[Any | None] = mapped_column(FlexibleVector(1536), nullable=True)
+    embedding_model: Mapped[str] = mapped_column(
+        String(64), default="text-embedding-3-small", nullable=False
+    )
+    embedding_dimension: Mapped[int] = mapped_column(Integer, default=1536, nullable=False)
+    model_version: Mapped[str] = mapped_column(String(32), default="v1", nullable=False)
     content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False

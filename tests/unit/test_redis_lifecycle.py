@@ -14,7 +14,7 @@ async def test_redis_lifecycle_and_health() -> None:
 
     mock_client = AsyncMock()
     mock_client.ping.return_value = True
-    mock_client.close = AsyncMock()
+    mock_client.aclose = AsyncMock()
 
     with patch("redis.asyncio.from_url", return_value=mock_client):
         # 1. Get client
@@ -32,7 +32,7 @@ async def test_redis_lifecycle_and_health() -> None:
 
         # 3. Close client
         await close_redis()
-        mock_client.close.assert_awaited_once()
+        mock_client.aclose.assert_awaited_once()
 
         # Calling close again is idempotent
         await close_redis()

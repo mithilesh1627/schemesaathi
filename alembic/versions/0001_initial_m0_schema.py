@@ -375,9 +375,18 @@ def upgrade() -> None:
         sa.Column("language_code", sa.String(length=16), server_default="en", nullable=False),
         sa.Column("section_title", sa.Text(), nullable=False),
         sa.Column("page_number", sa.Integer(), nullable=True),
+        sa.Column("chunk_index", sa.Integer(), server_default="0", nullable=False),
         sa.Column("chunk_content", sa.Text(), nullable=False),
         sa.Column("token_count", sa.Integer(), nullable=False),
         sa.Column("embedding", vector_type, nullable=True),
+        sa.Column(
+            "embedding_model",
+            sa.String(length=64),
+            server_default="text-embedding-3-small",
+            nullable=False,
+        ),
+        sa.Column("embedding_dimension", sa.Integer(), server_default="1536", nullable=False),
+        sa.Column("model_version", sa.String(length=32), server_default="v1", nullable=False),
         sa.Column("content_sha256", sa.String(length=64), nullable=False),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False

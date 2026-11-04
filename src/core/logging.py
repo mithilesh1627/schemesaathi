@@ -7,7 +7,8 @@ import sys
 from datetime import UTC, datetime
 from typing import Any
 
-# Context variable to propagate request_id across async calls
+from src.core.security import redact_aadhaar_pii, sanitize_sensitive_data
+
 request_id_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "request_id", default=None
 )
@@ -20,22 +21,25 @@ class JSONFormatter(logging.Formatter):
         timestamp = datetime.now(UTC).isoformat()
         req_id = request_id_ctx.get()
 
+        raw_message = record.getMessage()
+        safe_message = redact_aadhaar_pii(raw_message)
+
         log_data: dict[str, Any] = {
             "timestamp": timestamp,
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage(),
+            "message": safe_message,
         }
 
         if req_id:
             log_data["request_id"] = req_id
 
-        # Include extra fields if present
+        # Include extra fields if present, strictly scrubbed of Aadhaar sequences
         if hasattr(record, "extra") and isinstance(record.extra, dict):
-            log_data.update(record.extra)
+            log_data.update(sanitize_sensitive_data(record.extra))
 
         if record.exc_info:
-            log_data["exception"] = self.formatException(record.exc_info)
+            log_data["exception"] = redact_aadhaar_pii(self.formatException(record.exc_info))
 
         return json.dumps(log_data, ensure_ascii=False)
 

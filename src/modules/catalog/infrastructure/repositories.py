@@ -120,11 +120,15 @@ class SchemeRepository:
         await self.session.flush()
         return scheme
 
-    async def get_version_by_sha256(self, sha256_hash: str) -> SchemeVersion | None:
-        """Find an existing scheme version with identical SHA-256 hash."""
+    async def get_version_by_sha256(
+        self, sha256_hash: str, scheme_id: str | None = None
+    ) -> SchemeVersion | None:
+        """Find an existing scheme version with identical SHA-256 hash, optionally scoped by scheme."""
         stmt = select(SchemeVersion).where(SchemeVersion.content_sha256 == sha256_hash)
+        if scheme_id:
+            stmt = stmt.where(SchemeVersion.scheme_id == scheme_id)
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     async def get_next_version_number(self, scheme_id: str) -> int:
         """Get the next version number for a scheme."""

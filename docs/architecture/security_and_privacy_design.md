@@ -77,8 +77,19 @@ flowchart LR
 
 ### Mandatory Security Invariants:
 1. **Never Solicit Raw Identifiers:** The UI and chatbot system prompts strictly forbid asking for, accepting, or storing 12-digit Aadhaar numbers or Virtual IDs (VIDs).
-2. **Automated Redaction Filter:** An in-flight regex filter (`\b\d{4}[ -]?\d{4}[ -]?\d{4}\b`) intercepts user chat messages. Any 12-digit number matching the Verhoeff algorithm (Aadhaar checksum) is immediately scrubbed and replaced with `[REDACTED_AADHAAR]` before reaching memory or logs.
-3. **No Direct Banking Interfacing:** SchemeSaathi provides explanatory guidance on how students can check their NPCI seeding status via the official UIDAI portal (`resident.uidai.gov.in`) or their bank’s USSD code (`*99*99*1#`). SchemeSaathi never requests IFSC or account credentials.
+2. **Automated Redaction Filter (Verhoeff Heuristic Safeguard):**
+   - An in-flight regex filter (`\b\d{4}[ -]?\d{4}[ -]?\d{4}\b`) scans user input, URLs, logs, and exceptions.
+   - Any 12-digit sequence passing the Verhoeff dihedral-group ($D_5$) checksum is scrubbed and replaced with `[REDACTED_AADHAAR]`.
+   - **Crucial Security Distinction (Heuristic Checksum vs Authenticity):**  
+     Passing Verhoeff validation **DOES NOT** prove Aadhaar authenticity or government issuance. Genuine Aadhaar authentication requires statutory UIDAI biometric or OTP protocols under the Aadhaar Act 2016. In SchemeSaathi, Verhoeff functions strictly as a *defensive mathematical heuristic* to suppress false positives on arbitrary 12-digit timestamps or serial numbers while catching prospective Aadhaar patterns before persistence or logging.
+3. **Multi-Surface PII Scrubbing:**
+   - **Structured JSON Logging:** `JSONFormatter` intercepts `record.getMessage()`, `record.extra`, and exception tracebacks (`formatException`) through recursive sanitization.
+   - **HTTP Access Logs & URLs:** Request URL paths and query parameters are redacted before being emitted to stdout.
+   - **Centralized Error Responses:** API exception details returned to clients via `build_error_response()` are sanitized against Aadhaar leakage.
+4. **Request ID Validation & Header Injection Defense:**
+   - Client-provided `X-Request-ID` headers are validated against `^[a-zA-Z0-9_\-]{8,64}$`.
+   - Malformed, oversized, or CRLF-injected IDs are discarded, and an RFC 4122 UUIDv4 is generated server-side.
+5. **No Direct Banking Interfacing:** SchemeSaathi provides explanatory guidance on how students can check their NPCI seeding status via the official UIDAI portal (`resident.uidai.gov.in`) or their bank’s USSD code (`*99*99*1#`). SchemeSaathi never requests IFSC or account credentials.
 
 ---
 

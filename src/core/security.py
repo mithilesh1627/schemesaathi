@@ -1,6 +1,19 @@
-"""Security, Privacy, and In-Flight PII Redaction Controls."""
+"""Security, Privacy, and In-Flight PII Redaction Controls.
+
+Compliance Note:
+    Under DPDP Act 2023 and SchemeSaathi's Zero-Aadhaar policy, the platform NEVER stores,
+    indexes, or persists 12-digit Aadhaar identifiers. The Verhoeff algorithm implemented
+    below validates the dihedral-group (D5) mathematical checksum used in the 12th check digit.
+
+    IMPORTANT SECURITY DISTINCTION:
+    Passing Verhoeff validation DOES NOT prove Aadhaar authenticity or government issuance
+    (which requires statutory UIDAI biometric/OTP authentication protocols). Rather, Verhoeff
+    acts as a defensive heuristic filter to identify prospective Aadhaar sequences in-flight
+    and aggressively redact them from logs, exceptions, telemetry, and persistence.
+"""
 
 import re
+from typing import Any
 
 # Multiplication table for Verhoeff algorithm
 _VERHOEFF_D = [
@@ -62,3 +75,16 @@ def redact_aadhaar_pii(text: str) -> str:
         return matched_str
 
     return AADHAAR_PATTERN.sub(_replace_match, text)
+
+
+def sanitize_sensitive_data(val: Any) -> Any:
+    """Recursively scrub prospective Aadhaar sequences from strings, dicts, lists, and tuples."""
+    if isinstance(val, str):
+        return redact_aadhaar_pii(val)
+    if isinstance(val, dict):
+        return {k: sanitize_sensitive_data(v) for k, v in val.items()}
+    if isinstance(val, list):
+        return [sanitize_sensitive_data(item) for item in val]
+    if isinstance(val, tuple):
+        return tuple(sanitize_sensitive_data(item) for item in val)
+    return val

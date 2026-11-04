@@ -38,7 +38,13 @@ def get_engine() -> AsyncEngine:
                     "pool_size": settings.DB_POOL_SIZE,
                     "max_overflow": settings.DB_MAX_OVERFLOW,
                     "pool_timeout": settings.DB_POOL_TIMEOUT,
+                    "pool_recycle": settings.DB_POOL_RECYCLE,
                     "pool_pre_ping": True,
+                    "connect_args": {
+                        "server_settings": {
+                            "statement_timeout": str(settings.DB_STATEMENT_TIMEOUT_MS),
+                        }
+                    },
                 }
             )
 

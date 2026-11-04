@@ -253,3 +253,38 @@ flowchart TD
 - **PostgreSQL 16:** 4 vCPU, 16GB RAM, NVMe SSD storage with `pgvector` extension enabled.
 - **Redis Cache:** 1 vCPU, 2GB RAM.
 - **Estimated Monthly Operating Cost:** $<\$120$ USD on standard cloud infrastructure (Hetzner, AWS, or DigitalOcean), preserving public-good civic affordability.
+
+---
+
+## 6. Document Ingestion Guardrails & Deduplication Architecture
+
+The Catalog Ingestion subsystem handles official scholarship guideline documents and notifications. Ingestion must defend against malformed payloads, denial-of-service, and duplicate storage while ensuring absolute data integrity.
+
+### 6.1 Ingestion Hardening Pipeline
+
+```mermaid
+flowchart TD
+    Req["Base64 Document Ingestion Request"] --> V1{"Base64 Strict Decode<br/>validate=True"}
+    V1 -- Malformed --> Err1["400 Bad Request: Invalid Base64"]
+    V1 -- Valid --> V2{"Size Check<br/>byte_size <= MAX_INGESTION_FILE_SIZE_BYTES (10MB)"}
+    V2 -- Exceeded --> Err2["400 Bad Request: File Exceeds 10MB"]
+    V2 -- Within Limit --> V3{"Magic Bytes Check<br/>starts with b'%PDF-'"}
+    V3 -- Failed --> Err3["400 Bad Request: Missing PDF Signature"]
+    V3 -- Valid --> V4{"Structural Check<br/>trailing 1024 bytes contains b'%%EOF'"}
+    V4 -- Incomplete --> Err4["400 Bad Request: Truncated or Incomplete PDF"]
+    V4 -- Pass --> D1["Compute SHA-256 Digest"]
+    D1 --> Dedup{"Scoped Deduplication Check"}
+    Dedup -- Same Scheme + Same Hash --> Res1["DUPLICATE_IDENTICAL (Idempotent 200)"]
+    Dedup -- Cross Scheme / Version Reuse --> Res2["NEW_VERSION_REUSED_SOURCE (Ref-Linked 201)"]
+    Dedup -- New Document --> Res3["NEW_VERSION_REGISTERED (Persisted 201)"]
+```
+
+### 6.2 Key Ingestion Guardrails:
+1. **Size Limits (`MAX_INGESTION_FILE_SIZE_BYTES`):** Configurable threshold (default `10,485,760` bytes / 10MB) protects against RAM exhaustion attacks during base64 decoding.
+2. **Strict Base64 Decoding:** `base64.b64decode(..., validate=True)` immediately rejects corrupt strings or invalid padding.
+3. **File Signature & EOF Integrity:** Validates both the start header (`%PDF-`) and end-of-file trailer (`%%EOF` within last 1KB) to reject truncated or corrupted uploads.
+4. **Deterministic Safe Storage Boundaries:** Storage paths are isolated using content hashes: `documents/{sha256[:2]}/{sha256}.pdf`. Directory traversal attacks via file names are impossible.
+5. **Scoped Deduplication Semantics:**
+   - Same Scheme + Matching SHA-256: Returns `DUPLICATE_IDENTICAL` with existing version metadata.
+   - Cross-Scheme Source Reuse: When multiple schemes share a central omnibus guideline document, the physical payload is deduplicated while linking a new scheme version entry (`NEW_VERSION_REUSED_SOURCE`).
+

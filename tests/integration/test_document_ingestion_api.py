@@ -24,8 +24,8 @@ async def test_document_ingestion_and_sha256_deduplication(async_client: AsyncCl
     create_resp = await async_client.post("/api/v1/schemes/", json=scheme_payload)
     assert create_resp.status_code == 201
 
-    # 2. Ingest document v1
-    doc_content = b"%PDF-1.4 Official Manipur Scholarship Guidelines 2024-25 Content..."
+    # 2. Ingest document v1 (Valid PDF with magic bytes and EOF)
+    doc_content = b"%PDF-1.4 Official Manipur Scholarship Guidelines 2024-25 Content... %%EOF"
     doc_b64 = base64.b64encode(doc_content).decode("utf-8")
 
     ingest_payload = {
@@ -59,7 +59,7 @@ async def test_document_ingestion_and_sha256_deduplication(async_client: AsyncCl
 
     # 4. Ingest an updated/modified document -> Must create version 2
     doc_content_v2 = (
-        b"%PDF-1.4 Official Manipur Scholarship Guidelines 2024-25 REVISED CORRIGENDUM..."
+        b"%PDF-1.4 Official Manipur Scholarship Guidelines 2024-25 REVISED CORRIGENDUM... %%EOF"
     )
     doc_b64_v2 = base64.b64encode(doc_content_v2).decode("utf-8")
 
@@ -84,7 +84,7 @@ async def test_document_ingestion_and_sha256_deduplication(async_client: AsyncCl
 @pytest.mark.asyncio
 async def test_ingest_document_unknown_scheme_returns_404(async_client: AsyncClient) -> None:
     """Verify attempting to ingest for a non-existent scheme returns HTTP 404."""
-    doc_content = b"%PDF-1.4 Unknown Scheme Document"
+    doc_content = b"%PDF-1.4 Unknown Scheme Document %%EOF"
     doc_b64 = base64.b64encode(doc_content).decode("utf-8")
 
     payload = {
@@ -98,6 +98,71 @@ async def test_ingest_document_unknown_scheme_returns_404(async_client: AsyncCli
     assert response.status_code == 404
     data = response.json()
     assert data["error_code"] == "ERR_ENTITY_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_ingest_document_invalid_magic_bytes_returns_400(async_client: AsyncClient) -> None:
+    """Verify non-PDF file signature returns HTTP 400 error."""
+    # Create scheme first
+    scheme_payload = {
+        "scheme_id": "sch-ingest-magic-test",
+        "official_code": "MAGIC_TEST_01",
+        "title_en": "Magic Bytes Test Scheme",
+        "issuing_level": "STATE_SECTOR",
+        "ministry_or_department": "Dept of Education",
+        "implementing_agency": "Govt of Manipur",
+        "canonical_source_url": "https://example.gov.in",
+        "guidelines_document_url": "https://example.gov.in/doc.pdf",
+        "is_active": True,
+    }
+    await async_client.post("/api/v1/schemes/", json=scheme_payload)
+
+    # Send executable or image pretending to be document
+    fake_content = b"GIF89a Fake Image Content not a valid PDF file at all"
+    payload = {
+        "scheme_id": "sch-ingest-magic-test",
+        "academic_year": "2024-2025",
+        "source_url": "https://example.gov.in/fake.pdf",
+        "document_content_base64": base64.b64encode(fake_content).decode("utf-8"),
+    }
+
+    response = await async_client.post("/api/v1/ingest/document", json=payload)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["error_code"] == "ERR_INVALID_STATE"
+    assert "Missing standard '%PDF-' magic bytes header" in data["message"]
+
+
+@pytest.mark.asyncio
+async def test_ingest_document_missing_eof_marker_returns_400(async_client: AsyncClient) -> None:
+    """Verify truncated PDF missing %%EOF marker returns HTTP 400 error."""
+    scheme_payload = {
+        "scheme_id": "sch-ingest-eof-test",
+        "official_code": "EOF_TEST_01",
+        "title_en": "EOF Test Scheme",
+        "issuing_level": "STATE_SECTOR",
+        "ministry_or_department": "Dept of Education",
+        "implementing_agency": "Govt of Manipur",
+        "canonical_source_url": "https://example.gov.in",
+        "guidelines_document_url": "https://example.gov.in/doc.pdf",
+        "is_active": True,
+    }
+    await async_client.post("/api/v1/schemes/", json=scheme_payload)
+
+    # Has %PDF- but truncated before %%EOF
+    truncated_content = b"%PDF-1.4 Truncated PDF Document that cut off unexpectedly..."
+    payload = {
+        "scheme_id": "sch-ingest-eof-test",
+        "academic_year": "2024-2025",
+        "source_url": "https://example.gov.in/truncated.pdf",
+        "document_content_base64": base64.b64encode(truncated_content).decode("utf-8"),
+    }
+
+    response = await async_client.post("/api/v1/ingest/document", json=payload)
+    assert response.status_code == 400
+    data = response.json()
+    assert data["error_code"] == "ERR_INVALID_STATE"
+    assert "Missing standard PDF '%%EOF' marker" in data["message"]
 
 
 @pytest.mark.asyncio

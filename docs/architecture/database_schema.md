@@ -52,8 +52,14 @@ erDiagram
   1. *Scalar/JSONB Fast Filters:* Columns for `income_ceiling_annual_inr`, `minimum_qualifying_marks_percent`, `target_categories`, `eligible_domiciles`, and `eligible_course_levels`. These utilize PostgreSQL B-Tree and GIN indexes to discard 80% of non-matching schemes in $< 5 \text{ ms}$.
   2. *Deep AST Expression (`ast_rule_logic`):* Stored as a standardized [JSON-Logic](https://jsonlogic.com/) Abstract Syntax Tree. Handles nested Boolean statements (e.g., *“Must be (ST AND Manipur Domicile) OR (OBC AND Valley District) AND Income $\le 2.5\text{L}$”*).
 
-### 3.3 `scheme_knowledge_chunks` (pgvector Hybrid Storage)
-- **Problem Solved:** RAG chunking must preserve page numbers, issuing authorities, and official URLs for verifiable citation generation.
+### 3.3 `scheme_knowledge_chunks` (pgvector Hybrid Storage & Model Versioning)
+- **Problem Solved:** RAG chunking must preserve page numbers, issuing authorities, and official URLs for verifiable citation generation, while preventing vector-space contamination during model upgrades.
+- **Embedding Metadata & Versioning:**
+  - `chunk_index INTEGER NOT NULL`: Deterministic sequence order of chunk within the source version.
+  - `embedding_model VARCHAR(100) NOT NULL DEFAULT 'text-embedding-3-small'`: Explicit embedding model identifier.
+  - `embedding_dimension INTEGER NOT NULL DEFAULT 1536`: Dimension count matching vector configuration.
+  - `model_version VARCHAR(50) NOT NULL DEFAULT 'v1'`: Logical version of the embedding pipeline to prevent mixed-space vector retrieval when embedding models are upgraded.
+  - `content_sha256 VARCHAR(64) NOT NULL`: SHA-256 fingerprint of chunk text for granular deduplication.
 - **Vector Specification:** `embedding vector(1536)` indexed via **HNSW (Hierarchical Navigable Small World)** with `m = 16` and `ef_construction = 64`.
 - **Hybrid Search Engine:**
   - Dense Cosine Distance: `embedding <=> query_vector`
@@ -85,3 +91,35 @@ erDiagram
 | **Full Hybrid RRF Search** | `scheme_knowledge_chunks` | HNSW + `to_tsvector` GIN | $\le 35 \text{ ms}$ |
 | **Complete Profile Evaluation** | `scheme_eligibility_rules` | In-memory AST evaluation across filtered subset | $\le 15 \text{ ms}$ |
 | **Full Conversational History** | `chat_messages` | Composite B-Tree on `(session_id, created_at)` | $\le 3 \text{ ms}$ |
+
+---
+
+## 5. Database Connection Pool Configuration & Capacity Sizing
+
+PostgreSQL connection management is critical for high-concurrency civic portal traffic. SchemeSaathi employs SQLAlchemy 2's async connection pool (`AsyncEngine`) with explicit pool limits, statement timeouts, and connection recycling.
+
+### 5.1 Configurable Pool Parameters
+
+| Parameter | Environment Variable | Default Value | Description |
+| :--- | :--- | :--- | :--- |
+| **Base Pool Size** | `DB_POOL_SIZE` | `20` | Base persistent open connections maintained per Uvicorn worker process. |
+| **Max Overflow** | `DB_MAX_OVERFLOW` | `10` | Temporary burst connections opened above base pool during traffic surges. |
+| **Pool Timeout** | `DB_POOL_TIMEOUT` | `30.0` (sec) | Maximum wait time for a connection to become available before raising `TimeoutError`. |
+| **Pool Recycle** | `DB_POOL_RECYCLE` | `1800` (sec) | Maximum age of connection before automated recycling (prevents silent socket drops by cloud load balancers). |
+| **Statement Timeout** | `DB_STATEMENT_TIMEOUT_MS` | `30000` (ms) | PostgreSQL server-side execution timeout to terminate runaway queries. |
+| **Pool Pre-Ping** | *(Internal)* | `True` | Emits `SELECT 1` ping before handing connection to application to detect closed sockets. |
+
+### 5.2 Server Connection Math & Hardware Limits
+
+The total concurrent connections demanded from PostgreSQL is calculated as:
+$$\text{Max DB Connections} = N_{\text{workers}} \times (\text{DB\_POOL\_SIZE} + \text{DB\_MAX\_OVERFLOW})$$
+
+For the default production baseline:
+- $N_{\text{workers}} = 4$ Uvicorn processes
+- $\text{DB\_POOL\_SIZE} = 20$
+- $\text{DB\_MAX\_OVERFLOW} = 10$
+- $\text{Max Connections} = 4 \times (20 + 10) = 120\text{ connections}$
+
+**Database Sizing Requirement:**
+The PostgreSQL `postgresql.conf` setting `max_connections` MUST be configured to at least **150** (allowing 120 application connections + 30 reserved connections for migrations, background workers, and PostgreSQL superuser administration).
+

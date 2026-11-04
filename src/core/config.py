@@ -32,10 +32,30 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://schemesaathi:schemesaathi@localhost:5432/schemesaathi_db",
         description="Async SQLAlchemy database connection URI",
     )
-    DB_POOL_SIZE: int = 20
-    DB_MAX_OVERFLOW: int = 10
-    DB_POOL_TIMEOUT: float = 30.0
+    DB_POOL_SIZE: int = Field(
+        default=20, ge=1, le=100, description="Base persistent connection pool size"
+    )
+    DB_MAX_OVERFLOW: int = Field(
+        default=10, ge=0, le=50, description="Max burst connections beyond pool size"
+    )
+    DB_POOL_TIMEOUT: float = Field(
+        default=30.0, ge=1.0, description="Seconds to wait before raising pool timeout"
+    )
+    DB_POOL_RECYCLE: int = Field(
+        default=1800, ge=60, description="Seconds after which connections are recycled"
+    )
+    DB_STATEMENT_TIMEOUT_MS: int = Field(
+        default=30000, ge=1000, description="PostgreSQL query execution statement timeout in ms"
+    )
     DB_ECHO: bool = False
+
+    # Ingestion & Document Guardrails
+    MAX_INGESTION_FILE_SIZE_BYTES: int = Field(
+        default=10 * 1024 * 1024,
+        ge=1024,
+        le=50 * 1024 * 1024,
+        description="Maximum permitted document upload size in bytes (default 10 MB)",
+    )
 
     # Redis Configuration
     REDIS_URL: str = Field(

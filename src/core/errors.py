@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from src.core.logging import get_logger, request_id_ctx
+from src.core.security import sanitize_sensitive_data
 
 logger = get_logger(__name__)
 
@@ -107,12 +108,14 @@ def build_error_response(
     message: str,
     details: Any = None,
 ) -> JSONResponse:
-    """Build a standardized RFC-7807 compliant JSONResponse."""
+    """Build a standardized RFC-7807 compliant JSONResponse with PII scrubbing."""
     req_id = request_id_ctx.get()
+    safe_message = str(sanitize_sensitive_data(message))
+    safe_details = sanitize_sensitive_data(details) if details is not None else None
     envelope = StandardErrorEnvelope(
         error_code=error_code,
-        message=message,
-        details=details,
+        message=safe_message,
+        details=safe_details,
         request_id=req_id,
     )
     return JSONResponse(status_code=status_code, content=envelope.model_dump())
