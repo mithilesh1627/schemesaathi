@@ -1,0 +1,64 @@
+"""Security, Privacy, and In-Flight PII Redaction Controls."""
+
+import re
+
+# Multiplication table for Verhoeff algorithm
+_VERHOEFF_D = [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
+    [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
+    [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
+    [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
+    [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
+    [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
+    [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
+    [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
+    [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+]
+
+# Permutation table for Verhoeff algorithm
+_VERHOEFF_P = [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
+    [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
+    [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+    [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
+    [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
+    [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
+    [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
+]
+
+# Regex to match 12-digit number sequences (with optional spaces or dashes)
+AADHAAR_PATTERN = re.compile(r"\b\d{4}[ -]?\d{4}[ -]?\d{4}\b")
+
+
+def validate_verhoeff(num_str: str) -> bool:
+    """Validate 12-digit number using Verhoeff algorithm (Aadhaar checksum)."""
+    clean_num = re.sub(r"\D", "", num_str)
+    if len(clean_num) != 12:
+        return False
+
+    c = 0
+    reversed_digits = [int(d) for d in reversed(clean_num)]
+    for i, digit in enumerate(reversed_digits):
+        c = _VERHOEFF_D[c][_VERHOEFF_P[i % 8][digit]]
+
+    return c == 0
+
+
+def redact_aadhaar_pii(text: str) -> str:
+    """Detect and redact any 12-digit number sequence validating as an Aadhaar number.
+
+    Replaces verified numbers with [REDACTED_AADHAAR] in compliance with Zero-Aadhaar policy.
+    """
+    if not text:
+        return text
+
+    def _replace_match(match: re.Match[str]) -> str:
+        matched_str = match.group(0)
+        clean_digits = re.sub(r"\D", "", matched_str)
+        if len(clean_digits) == 12 and validate_verhoeff(clean_digits):
+            return "[REDACTED_AADHAAR]"
+        return matched_str
+
+    return AADHAAR_PATTERN.sub(_replace_match, text)

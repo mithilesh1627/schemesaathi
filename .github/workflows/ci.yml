@@ -1,0 +1,113 @@
+name: SchemeSaathi CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-and-typecheck:
+    name: Code Quality (Ruff & Mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.5.26"
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        run: |
+          uv pip install --system -e ".[dev]"
+
+      - name: Run Ruff Linter
+        run: |
+          ruff check .
+
+      - name: Run Ruff Formatter Check
+        run: |
+          ruff format --check .
+
+      - name: Run Mypy Type Checker
+        run: |
+          mypy src tests
+
+  test-suite:
+    name: Automated Unit & Integration Tests
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: schemesaathi
+          POSTGRES_PASSWORD: schemesaathi_test_password
+          POSTGRES_DB: schemesaathi_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.5.26"
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        run: |
+          uv pip install --system -e ".[dev]"
+
+      - name: Run Alembic Migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://schemesaathi:schemesaathi_test_password@localhost:5432/schemesaathi_test_db
+        run: |
+          alembic upgrade head
+
+      - name: Run Pytest with Coverage
+        env:
+          ENVIRONMENT: testing
+          DATABASE_URL: postgresql+asyncpg://schemesaathi:schemesaathi_test_password@localhost:5432/schemesaathi_test_db
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-ci-secret-key-for-automated-runs
+        run: |
+          pytest --cov=src --cov-report=term-missing --cov-report=xml
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.xml

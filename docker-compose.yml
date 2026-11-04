@@ -1,0 +1,79 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: schemesaathi-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      - DATABASE_URL=postgresql+asyncpg://schemesaathi:schemesaathi_dev_password@db:5432/schemesaathi_db
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=development-secret-key-replace-in-production-vault
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - schemesaathi-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: schemesaathi-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: schemesaathi
+      POSTGRES_PASSWORD: schemesaathi_dev_password
+      POSTGRES_DB: schemesaathi_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - schemesaathi-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U schemesaathi -d schemesaathi_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: schemesaathi-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - schemesaathi-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  pgdata:
+    name: schemesaathi-pgdata
+  redisdata:
+    name: schemesaathi-redisdata
+
+networks:
+  schemesaathi-net:
+    name: schemesaathi-net
+    driver: bridge

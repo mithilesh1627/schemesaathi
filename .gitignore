@@ -1,0 +1,32 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Linters and type checkers
+.ruff_cache/
+.mypy_cache/
+
+# Environment files
+.env
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+Desktop.ini

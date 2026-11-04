@@ -1,0 +1,400 @@
+openapi: 3.1.0
+info:
+  title: SchemeSaathi API Specification
+  description: >
+    Official RESTful API contracts for SchemeSaathi, an intelligent multilingual 
+    Indian Government Scholarship Discovery & Eligibility Verification Platform.
+    Compliant with DPDP Act 2023, stateless ephemeral evaluation, and deterministic AST rule execution.
+  version: 1.0.0
+  contact:
+    name: SchemeSaathi Core Architecture Team
+    url: https://schemesaathi.in
+servers:
+  - url: https://api.schemesaathi.in/v1
+    description: Production Gateway
+  - url: http://localhost:8000/v1
+    description: Local Development Environment
+
+paths:
+  /schemes/catalog:
+    get:
+      summary: Retrieve Paginated Scheme Catalog
+      description: Returns a filtered, paginated catalog of officially verified scholarships.
+      operationId: getSchemeCatalog
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [GENERAL, SC, ST, OBC, EBC, DNT, MINORITY_MUSLIM, MINORITY_CHRISTIAN, ALL]
+        - name: domicile
+          in: query
+          required: false
+          schema:
+            type: string
+            example: MANIPUR
+        - name: course_level
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [PRE_MATRIC, HIGHER_SECONDARY, DIPLOMA, UNDERGRADUATE, POSTGRADUATE, MPHIL_PHD]
+        - name: portal_status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [OPEN, CLOSED, UPCOMING, ALL]
+            default: ALL
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated catalog of schemes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSchemeList'
+        '400':
+          $ref: '#/components/schemas/StandardError'
+
+  /schemes/{scheme_id}:
+    get:
+      summary: Get Detailed Scheme Definition
+      description: Returns full statutory rules, benefits breakdown, active application window, and required documents.
+      operationId: getSchemeById
+      parameters:
+        - name: scheme_id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: sch-mn-001
+      responses:
+        '200':
+          description: Detailed scheme record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemeDetail'
+        '404':
+          description: Scheme not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  /eligibility/evaluate:
+    post:
+      summary: Deterministic Profile Eligibility Evaluation
+      description: >
+        Mathematically evaluates applicant parameters against statutory JSON-Logic AST rules.
+        Guaranteed zero LLM hallucination. Outputs tiered eligibility and line-by-line diagnostics.
+      operationId: evaluateEligibility
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluationRequest'
+      responses:
+        '200':
+          description: Comprehensive deterministic evaluation report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationReport'
+        '422':
+          description: Validation error in profile schema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  /chat/message:
+    post:
+      summary: Conversational Multilingual Query & RAG
+      description: >
+        Handles natural language multi-turn dialogue in English, Hindi, or Manipuri (Meiteilon).
+        Injects deterministic state guardrails and provides verifiable inline citations [^1].
+      operationId: sendChatMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatMessageRequest'
+      responses:
+        '200':
+          description: Synthesized response with citations and suggested slot prompts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessageResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardError'
+
+  /documents/checklist:
+    post:
+      summary: Generate Personalized Document Readiness Checklist
+      description: >
+        Generates an actionable pre-submission checklist detailing required documents,
+        competent issuing authorities (e.g. SDO vs Village Headman), and PFMS/NPCI bank seeding status.
+      operationId: generateDocumentChecklist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentChecklistRequest'
+      responses:
+        '200':
+          description: Structured checklist and warning dossier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentChecklistResponse'
+
+  /telemetry/health:
+    get:
+      summary: Platform Health & Dependency Telemetry
+      description: Returns health status of database, pgvector indexing, and cache.
+      operationId: getHealthStatus
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: "HEALTHY" }
+                  version: { type: string, example: "1.0.0-m0" }
+                  database: { type: string, example: "CONNECTED" }
+                  vector_extension: { type: string, example: "PGVECTOR_ACTIVE" }
+                  latency_ms: { type: integer, example: 4 }
+
+components:
+  schemas:
+    StandardError:
+      type: object
+      required: [error_code, message, timestamp]
+      properties:
+        error_code: { type: string, example: "ERR_VALIDATION_FAILED" }
+        message: { type: string, example: "Invalid family income value provided." }
+        details: { type: object }
+        timestamp: { type: string, format: date-time }
+
+    PaginatedSchemeList:
+      type: object
+      required: [total, page, limit, schemes]
+      properties:
+        total: { type: integer, example: 44 }
+        page: { type: integer, example: 1 }
+        limit: { type: integer, example: 20 }
+        schemes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchemeSummary'
+
+    SchemeSummary:
+      type: object
+      required: [scheme_id, official_code, title, issuing_level, portal_status]
+      properties:
+        scheme_id: { type: string, example: "sch-mn-005" }
+        official_code: { type: string, example: "MANIPUR_ST_POST_MATRIC" }
+        title:
+          type: object
+          properties:
+            en: { type: string, example: "Post-Matric Scholarship for ST Students - Manipur" }
+            mni_beng: { type: string, example: "ꯃꯅꯤꯄꯨꯔꯒꯤ ST ꯃꯆꯥꯁꯤꯡꯒꯤ ꯄꯣꯁ꯭ꯠ-ꯃꯦꯠꯔꯤꯛ ꯁ꯭ꯀꯣꯂꯔꯁꯤꯞ" }
+        issuing_level: { type: string, enum: [CENTRAL_SECTOR, CENTRALLY_SPONSORED, STATE_SECTOR] }
+        ministry_or_department: { type: string, example: "Department of Tribal Affairs & Hills, Manipur" }
+        portal_status: { type: string, enum: [OPEN, CLOSED, UPCOMING, UNKNOWN] }
+        income_ceiling_annual_inr: { type: number, nullable: true, example: 250000 }
+
+    SchemeDetail:
+      type: object
+      required: [scheme_id, official_code, title, issuing_level, statutory_eligibility, benefits, application_lifecycle]
+      properties:
+        scheme_id: { type: string, example: "sch-ner-012" }
+        official_code: { type: string, example: "UGC_ISHAN_UDAY_NER" }
+        title: { type: object }
+        issuing_level: { type: string }
+        ministry_or_department: { type: string }
+        canonical_source_url: { type: string, format: uri }
+        guidelines_document_url: { type: string, format: uri }
+        content_sha256: { type: string }
+        academic_year: { type: string, example: "2024-2025" }
+        statutory_eligibility:
+          type: object
+          properties:
+            income_ceiling_annual_inr: { type: number, example: 450000 }
+            target_categories: { type: array, items: { type: string } }
+            eligible_domiciles: { type: array, items: { type: string } }
+            eligible_course_levels: { type: array, items: { type: string } }
+            mandates_ner_schooling: { type: boolean, example: true }
+        benefits:
+          type: object
+          properties:
+            allowance_annual_inr: { type: number, example: 54000 }
+            tuition_coverage: { type: string }
+        application_lifecycle:
+          type: object
+          properties:
+            portal_type: { type: string, example: "NSP_2_0" }
+            portal_url: { type: string, format: uri }
+            portal_status: { type: string, example: "CLOSED" }
+            requires_otr_face_rd: { type: boolean, example: true }
+
+    EvaluationRequest:
+      type: object
+      required: [demographics, financial, academic]
+      properties:
+        session_id: { type: string, example: "sess_ephem_98234" }
+        demographics:
+          type: object
+          required: [social_category, gender, domicile_state]
+          properties:
+            social_category: { type: string, enum: [GENERAL, SC, ST, OBC, EBC, DNT] }
+            gender: { type: string, enum: [MALE, FEMALE, TRANSGENDER] }
+            domicile_state: { type: string, example: "MANIPUR" }
+            is_displaced_affected: { type: boolean, default: false }
+            is_differently_abled: { type: boolean, default: false }
+            disability_percentage: { type: number, nullable: true }
+        financial:
+          type: object
+          required: [annual_family_income_inr]
+          properties:
+            annual_family_income_inr: { type: number, example: 210000 }
+            income_certificate_authority: { type: string, enum: [SDO, TEHSILDAR, DC, VILLAGE_AUTHORITY, OTHER] }
+        academic:
+          type: object
+          required: [current_course_level, current_course_year, previous_qualifying_marks_percent]
+          properties:
+            current_course_level: { type: string, enum: [PRE_MATRIC, HIGHER_SECONDARY, DIPLOMA, UNDERGRADUATE, POSTGRADUATE, MPHIL_PHD] }
+            current_course_year: { type: integer, example: 1 }
+            previous_qualifying_marks_percent: { type: number, example: 74.5 }
+            qualifying_board: { type: string, example: "COHSEM" }
+            is_institution_in_ner: { type: boolean, default: true }
+            is_distance_learning: { type: boolean, default: false }
+
+    EvaluationReport:
+      type: object
+      required: [total_checked, total_eligible, schemes_by_tier, execution_time_ms]
+      properties:
+        total_checked: { type: integer, example: 44 }
+        total_eligible: { type: integer, example: 3 }
+        execution_time_ms: { type: integer, example: 8 }
+        schemes_by_tier:
+          type: object
+          properties:
+            eligible_now:
+              type: array
+              items: { $ref: '#/components/schemas/EvaluatedSchemeResult' }
+            eligible_off_cycle:
+              type: array
+              items: { $ref: '#/components/schemas/EvaluatedSchemeResult' }
+            conditionally_eligible:
+              type: array
+              items: { $ref: '#/components/schemas/EvaluatedSchemeResult' }
+            ineligible:
+              type: array
+              items: { $ref: '#/components/schemas/EvaluatedSchemeResult' }
+
+    EvaluatedSchemeResult:
+      type: object
+      required: [scheme_id, scheme_title, status, diagnostics]
+      properties:
+        scheme_id: { type: string }
+        scheme_title: { type: string }
+        status: { type: string, enum: [ELIGIBLE_NOW, ELIGIBLE_OFF_CYCLE, CONDITIONALLY_ELIGIBLE, INELIGIBLE] }
+        diagnostics:
+          type: array
+          items:
+            type: object
+            properties:
+              clause: { type: string }
+              passed: { type: boolean }
+              explanation_en: { type: string }
+              explanation_mni: { type: string }
+        missing_fields:
+          type: array
+          items: { type: string }
+
+    ChatMessageRequest:
+      type: object
+      required: [session_id, message]
+      properties:
+        session_id: { type: string }
+        message: { type: string, example: "I am an ST student from Churachandpur studying B.Tech. What scholarship can I get?" }
+        language_preference: { type: string, enum: [en, hi, mni_beng, mni_latn], default: en }
+        current_profile_context: { $ref: '#/components/schemas/EvaluationRequest' }
+
+    ChatMessageResponse:
+      type: object
+      required: [session_id, response_text, citations]
+      properties:
+        session_id: { type: string }
+        response_text: { type: string }
+        detected_language: { type: string }
+        citations:
+          type: array
+          items:
+            type: object
+            properties:
+              citation_id: { type: string }
+              source_title: { type: string }
+              source_url: { type: string, format: uri }
+              page_number: { type: integer }
+              academic_year: { type: string }
+        suggested_follow_up_questions:
+          type: array
+          items: { type: string }
+
+    DocumentChecklistRequest:
+      type: object
+      required: [scheme_ids, profile]
+      properties:
+        scheme_ids: { type: array, items: { type: string } }
+        profile: { $ref: '#/components/schemas/EvaluationRequest' }
+
+    DocumentChecklistResponse:
+      type: object
+      required: [documents, npci_dbt_warning, otr_readiness_guide]
+      properties:
+        documents:
+          type: array
+          items:
+            type: object
+            properties:
+              document_code: { type: string }
+              name: { type: string }
+              issuing_authority: { type: string }
+              validity_note: { type: string }
+              common_rejection_pitfall: { type: string }
+        npci_dbt_warning:
+          type: object
+          properties:
+            is_critical: { type: boolean, example: true }
+            guidance_text: { type: string }
+        otr_readiness_guide:
+          type: object
+          properties:
+            requires_face_rd: { type: boolean }
+            common_app_error: { type: string }
