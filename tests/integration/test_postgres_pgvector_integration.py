@@ -264,6 +264,13 @@ async def test_postgres_scheme_repository_latest_version_and_gin_containment(
     pg_engine: AsyncEngine,
 ) -> None:
     """Verify SchemeRepository on PostgreSQL 16 restricts queries to latest version and uses JSONB GIN containment."""
+    if not check_postgres_availability():
+        if os.getenv("CI") == "true":
+            pytest.fail(
+                "PostgreSQL 16 + pgvector instance is required in CI but is currently unreachable."
+            )
+        pytest.skip("PostgreSQL 16 + pgvector instance is not reachable (local non-CI run)")
+
     session_factory = async_sessionmaker(pg_engine, expire_on_commit=False)
 
     prefix = uuid.uuid4().hex[:6]
