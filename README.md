@@ -11,6 +11,29 @@ Milestone M0 establishes the complete theoretical, architectural, statutory, and
 
 ---
 
+## Milestone M1: Modular Monolith Implementation
+
+### Sprint 1: Backend Foundation, Schema Migrations, Ingestion & Hardening
+- **Status:** **SIGNED OFF & READY FOR SPRINT 2** (Git Commit `467703c`)
+- **Implemented Capabilities:**
+  - Python 3.12 FastAPI modular monolith architecture with Domain-Driven Design (DDD) module boundaries.
+  - SQLAlchemy 2.0 Async, asyncpg, and Alembic migrations targeting PostgreSQL 16 + pgvector.
+  - Reversible database migrations (`0001_initial_m0_schema.py` and `0002_add_document_storage_fields.py`).
+  - Liveness (`/health/live`) and readiness (`/health/ready`) probes verifying live PostgreSQL and Redis pools.
+  - Immutable document ingestion storage (`LocalStorageBackend`) with temporary atomic `.tmp` writes, fsync, atomic rename, and read-back SHA-256 verification.
+  - Strict upload limits: 15 MB HTTP middleware cap, 14 MB base64 string schema limit, 10 MB decoded byte limit with consistent HTTP 413 responses.
+  - Administrative authentication (`X-Admin-API-Key` / `Authorization: Bearer`) and Redis sliding-window write rate limiting (429 with `Retry-After`, 503 fail-closed).
+  - Production fail-safe startup: refuses startup if default `SECRET_KEY`, unconfigured `ADMIN_API_KEY`, `DEBUG=True`, `sqlite`, or wildcard `CORS_ORIGINS=["*"]` with credentials are used.
+  - Connection pool math: $2\text{ workers} \times (10 + 5) = 30$ max database connections documented and configured.
+  - In-flight DPDP Act 2023 privacy protection: unconditional 12-digit Aadhaar sequence redaction (`[REDACTED_AADHAAR]`) and Pydantic validation error sanitization (stripping submitted input payloads from logs and error responses).
+  - Multi-version catalog isolation: filtering applies strictly to the latest scheme version (`ROW_NUMBER() OVER (PARTITION BY scheme_id ORDER BY version_number DESC) == 1`) and utilizes PostgreSQL JSONB containment (`@>`) leveraging existing GIN indexes.
+  - Production multi-stage Dockerfile with non-root user and verified `--no-cache` builds.
+  - CI workflow configured with real PostgreSQL 16 + pgvector on port 5432.
+  - **Test Suite:** 86 tests (100% passing, 0 warnings, 0 skips, **97% overall coverage**).
+  - **Next Milestone Target:** Sprint 2 — Deterministic Eligibility Evaluation Engine & JSON-Logic AST Interpreter.
+
+---
+
 ## Documentation Structure & Deliverables Navigation
 
 ### 1. Research & Problem Validation (`docs/research/`)
