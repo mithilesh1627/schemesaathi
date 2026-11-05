@@ -76,6 +76,8 @@ def redact_aadhaar_pii(text: str) -> str:
 
 def sanitize_sensitive_data(val: Any) -> Any:
     """Recursively scrub prospective Aadhaar sequences from strings, dicts, lists, and tuples."""
+    if isinstance(val, Exception):
+        return redact_aadhaar_pii(str(val))
     if isinstance(val, str):
         return redact_aadhaar_pii(val)
     if isinstance(val, dict):

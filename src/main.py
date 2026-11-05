@@ -2,18 +2,22 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from src.api.health import router as health_router
 from src.core.config import settings
-from src.core.database import close_db_engine, get_engine
+from src.core.database import close_db_engine, get_engine, get_session_factory
 from src.core.errors import register_exception_handlers
 from src.core.logging import get_logger, setup_logging
 from src.core.middleware import RequestIDMiddleware, RequestSizeLimitMiddleware
 from src.core.redis import close_redis
+from src.modules.catalog.infrastructure.seed_data import seed_pilot_schemes
 from src.modules.catalog.router import router as catalog_router
+from src.modules.eligibility.router import router as eligibility_router
 
 logger = get_logger(__name__)
 
@@ -33,6 +37,13 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize DB connection pool eagerly
     try:
         get_engine()
+        if not settings.is_production:
+            try:
+                session_factory = get_session_factory()
+                async with session_factory() as session:
+                    await seed_pilot_schemes(session)
+            except Exception as seed_err:
+                logger.warning("Auto-seed on startup skipped: %s", seed_err)
     except Exception as exc:
         logger.error("Database connection initialization warning: %s", str(exc))
 
@@ -51,7 +62,7 @@ def create_app() -> FastAPI:
         title="SchemeSaathi API",
         description=(
             "Intelligent Multilingual Indian Government Scholarship Discovery Platform. "
-            "Milestone M1 Sprint 1 Backend Modular Monolith."
+            "Milestone M1 Sprint 1 & Sprint 2 Backend Modular Monolith."
         ),
         version=settings.VERSION,
         lifespan=lifespan,
@@ -79,6 +90,21 @@ def create_app() -> FastAPI:
 
     # 4. Register Bounded Context Routers
     app.include_router(catalog_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(eligibility_router, prefix=settings.API_V1_PREFIX)
+
+    # 5. Register Thin Demo Webpage
+    @app.get(
+        "/demo",
+        response_class=HTMLResponse,
+        tags=["Demo"],
+        summary="Manipur Pilot Interactive Demo",
+    )
+    async def get_demo_page() -> HTMLResponse:
+        """Serve minimal single-page demo for reviewer evaluation."""
+        template_path = Path(__file__).parent / "templates" / "demo.html"
+        if template_path.is_file():
+            return HTMLResponse(content=template_path.read_text(encoding="utf-8"))
+        return HTMLResponse(content="<h1>Demo template not found</h1>", status_code=404)
 
     return app
 

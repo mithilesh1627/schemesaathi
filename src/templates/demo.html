@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SchemeSaathi — Manipur Pilot Demo</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --border: #e2e8f0;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success-bg: #ecfdf5;
+      --success-text: #065f46;
+      --success-border: #a7f3d0;
+      --danger-bg: #fef2f2;
+      --danger-text: #991b1b;
+      --danger-border: #fecaca;
+      --warn-bg: #fffbeb;
+      --warn-text: #92400e;
+      --warn-border: #fde68a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 1.5rem; line-height: 1.5; }
+    .container { max-width: 900px; margin: 0 auto; }
+    .banner {
+      background-color: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      color: var(--warn-text);
+      padding: 0.875rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+    header { margin-bottom: 1.5rem; }
+    h1 { font-size: 1.75rem; color: #1e293b; margin-bottom: 0.25rem; }
+    p.subtitle { color: var(--muted); font-size: 0.95rem; }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-bottom: 1.5rem;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+    label { font-size: 0.85rem; font-weight: 600; color: #334155; }
+    input[type="text"], input[type="number"], select {
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.95rem;
+      background: #fff;
+    }
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      grid-column: 1 / -1;
+    }
+    .checkbox-group input { width: 1.1rem; height: 1.1rem; }
+    button.submit-btn {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 1rem;
+      width: 100%;
+      transition: background-color 0.15s;
+    }
+    button.submit-btn:hover { background-color: var(--primary-hover); }
+    button.submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .metrics-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      background: #f1f5f9;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      font-weight: 500;
+    }
+    .results-list { display: flex; flex-direction: column; gap: 1rem; }
+    .scheme-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      background: #ffffff;
+      transition: box-shadow 0.15s;
+    }
+    .scheme-card.ELIGIBLE { border-left: 6px solid #10b981; }
+    .scheme-card.NOT_ELIGIBLE { border-left: 6px solid #ef4444; }
+    .scheme-card.UNKNOWN { border-left: 6px solid #f59e0b; }
+    .scheme-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .scheme-title { font-size: 1.1rem; font-weight: 700; color: #1e293b; }
+    .badge {
+      padding: 0.25rem 0.7rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+    .badge.ELIGIBLE { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
+    .badge.NOT_ELIGIBLE { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+    .badge.UNKNOWN { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+    .diagnostics-list {
+      margin: 0.75rem 0;
+      padding: 0.5rem 0.75rem;
+      background: #f8fafc;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .diag-item { display: flex; align-items: baseline; gap: 0.5rem; }
+    .diag-icon { font-weight: bold; width: 1.2rem; text-align: center; }
+    .diag-icon.PASS { color: #10b981; }
+    .diag-icon.FAIL { color: #ef4444; }
+    .diag-icon.UNKNOWN { color: #f59e0b; }
+    .scheme-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid #f1f5f9;
+      font-size: 0.85rem;
+    }
+    .portal-link {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .portal-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="banner">
+      Demo — Manipur pilot. Not a public launch. Results are indicative and must be confirmed on the official portal.
+    </div>
+
+    <header>
+      <h1>SchemeSaathi Eligibility Evaluator</h1>
+      <p class="subtitle">Deterministic Statutory Intelligence Engine &bull; Pilot Phase</p>
+    </header>
+
+    <div class="card">
+      <form id="evaluation-form">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="domicile_state">Domicile State</label>
+            <input type="text" id="domicile_state" name="domicile_state" value="MANIPUR" placeholder="e.g. MANIPUR" />
+          </div>
+
+          <div class="form-group">
+            <label for="social_category">Social Category</label>
+            <select id="social_category" name="social_category">
+              <option value="">-- Not Provided --</option>
+              <option value="ST" selected>ST (Scheduled Tribe)</option>
+              <option value="SC">SC (Scheduled Caste)</option>
+              <option value="OBC">OBC (Other Backward Class)</option>
+              <option value="GENERAL">General / Unreserved</option>
+              <option value="EBC">EBC (Economically Backward Class)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="annual_family_income_inr">Annual Family Income (₹ INR)</label>
+            <input type="number" id="annual_family_income_inr" name="annual_family_income_inr" value="200000" placeholder="e.g. 200000" min="0" step="1000" />
+          </div>
+
+          <div class="form-group">
+            <label for="course_level">Course Level</label>
+            <select id="course_level" name="course_level">
+              <option value="">-- Not Provided --</option>
+              <option value="UNDERGRADUATE" selected>Undergraduate (Degree / B.A / B.Sc / B.Tech)</option>
+              <option value="POSTGRADUATE">Postgraduate (M.A / M.Sc / M.Com)</option>
+              <option value="CLASS_9_10">Pre-Matric (Class IX - X)</option>
+              <option value="POST_MATRIC">Post-Matric (Class XI - XII / Diploma)</option>
+              <option value="DIPLOMA">Polytechnic / Diploma</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="marks_percent">Qualifying Marks (%)</label>
+            <input type="number" id="marks_percent" name="marks_percent" value="65.0" placeholder="e.g. 65.0" min="0" max="100" step="0.1" />
+          </div>
+
+          <div class="form-group">
+            <label for="gender">Gender</label>
+            <select id="gender" name="gender">
+              <option value="">-- Not Provided --</option>
+              <option value="FEMALE" selected>Female</option>
+              <option value="MALE">Male</option>
+              <option value="TRANSGENDER">Transgender</option>
+              <option value="OTHER">Other</option>
+            </select>
+          </div>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="is_displaced" name="is_displaced" />
+            <label for="is_displaced">Applicant is displaced or affected by social conflict (Rehabilitation Eligibility)</label>
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submit-btn">Evaluate Statutory Eligibility</button>
+      </form>
+    </div>
+
+    <div id="results-area" style="display: none;">
+      <div class="metrics-bar" id="metrics-bar">
+        <span>Evaluated in <strong id="time-ms">0</strong> ms</span>
+        <span id="counts-summary">0 Eligible &bull; 0 Not Eligible &bull; 0 Unknown</span>
+      </div>
+
+      <div class="results-list" id="results-list"></div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('evaluation-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const resultsArea = document.getElementById('results-area');
+    const resultsList = document.getElementById('results-list');
+    const timeMsSpan = document.getElementById('time-ms');
+    const countsSpan = document.getElementById('counts-summary');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Evaluating Deterministic Rules...';
+
+      const payload = {};
+      const domicile = document.getElementById('domicile_state').value.trim();
+      if (domicile) payload.domicile_state = domicile;
+
+      const category = document.getElementById('social_category').value;
+      if (category) payload.social_category = category;
+
+      const income = document.getElementById('annual_family_income_inr').value;
+      if (income !== '') payload.annual_family_income_inr = parseFloat(income);
+
+      const course = document.getElementById('course_level').value;
+      if (course) payload.course_level = course;
+
+      const marks = document.getElementById('marks_percent').value;
+      if (marks !== '') payload.marks_percent = parseFloat(marks);
+
+      const gender = document.getElementById('gender').value;
+      if (gender) payload.gender = gender;
+
+      payload.is_displaced = document.getElementById('is_displaced').checked;
+
+      try {
+        const res = await fetch('/api/v1/eligibility/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          alert('Evaluation error: ' + (errData.detail || errData.message || res.statusText));
+          return;
+        }
+
+        const data = await res.json();
+        renderResults(data);
+      } catch (err) {
+        alert('Failed to connect to evaluation engine: ' + err.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Evaluate Statutory Eligibility';
+      }
+    });
+
+    function renderResults(data) {
+      resultsArea.style.display = 'block';
+      timeMsSpan.textContent = data.execution_duration_ms;
+      countsSpan.innerHTML = `<strong>${data.total_eligible}</strong> Eligible &bull; <strong>${data.total_not_eligible}</strong> Not Eligible &bull; <strong>${data.total_unknown}</strong> Unknown`;
+
+      resultsList.innerHTML = '';
+      if (!data.schemes || data.schemes.length === 0) {
+        resultsList.innerHTML = '<div class="card">No schemes available in catalog.</div>';
+        return;
+      }
+
+      data.schemes.forEach((sch) => {
+        const card = document.createElement('div');
+        card.className = `scheme-card ${sch.overall_outcome}`;
+
+        const badgeText = sch.overall_outcome.replace('_', ' ');
+
+        let diagnosticsHtml = '';
+        if (sch.diagnostics && sch.diagnostics.length > 0) {
+          diagnosticsHtml = sch.diagnostics.map((d) => {
+            const icon = d.outcome === 'PASS' ? '&#10003;' : (d.outcome === 'FAIL' ? '&#10007;' : '?');
+            return `<div class="diag-item">
+              <span class="diag-icon ${d.outcome}">${icon}</span>
+              <div><strong>${d.clause_name}:</strong> ${d.explanation_en}</div>
+            </div>`;
+          }).join('');
+        }
+
+        card.innerHTML = `
+          <div class="scheme-header">
+            <div>
+              <div class="scheme-title">${sch.scheme_title}</div>
+              <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">Code: ${sch.scheme_id}</div>
+            </div>
+            <span class="badge ${sch.overall_outcome}">${badgeText}</span>
+          </div>
+
+          <div class="diagnostics-list">
+            ${diagnosticsHtml}
+          </div>
+
+          <div class="scheme-footer">
+            <span style="color: #64748b;">
+              Portal: <strong>${sch.portal_type || 'NSP 2.0'}</strong> (${sch.portal_status || 'UNKNOWN'})
+            </span>
+            <a href="${sch.official_source_url}" target="_blank" rel="noopener noreferrer" class="portal-link">
+              Official Portal &rarr;
+            </a>
+          </div>
+        `;
+        resultsList.appendChild(card);
+      });
+
+      resultsArea.scrollIntoView({ behavior: 'smooth' });
+    }
+  </script>
+</body>
+</html>

@@ -205,11 +205,14 @@ def sanitize_validation_errors(errors: Sequence[Any]) -> list[dict[str, Any]]:
         }
         if "ctx" in err and isinstance(err["ctx"], dict):
             # Keep safe numeric/string bounds (e.g. limit_value) but omit raw inputs
-            clean_ctx = {
-                k: sanitize_sensitive_data(v)
-                for k, v in err["ctx"].items()
-                if k not in ("input", "raw")
-            }
+            clean_ctx = {}
+            for k, v in err["ctx"].items():
+                if k in ("input", "raw"):
+                    continue
+                if isinstance(v, Exception):
+                    clean_ctx[k] = sanitize_sensitive_data(str(v))
+                else:
+                    clean_ctx[k] = sanitize_sensitive_data(v)
             if clean_ctx:
                 clean_err["ctx"] = clean_ctx
         sanitized.append(clean_err)

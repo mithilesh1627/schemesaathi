@@ -14,7 +14,7 @@ Milestone M0 establishes the complete theoretical, architectural, statutory, and
 ## Milestone M1: Modular Monolith Implementation
 
 ### Sprint 1: Backend Foundation, Schema Migrations, Ingestion & Hardening
-- **Status:** **SIGNED OFF & READY FOR SPRINT 2** (Git Commit `467703c`)
+- **Status:** **SIGNED OFF & READY FOR SPRINT 2** (Git Commit `5394880`, CI Run `42018771441`)
 - **Implemented Capabilities:**
   - Python 3.12 FastAPI modular monolith architecture with Domain-Driven Design (DDD) module boundaries.
   - SQLAlchemy 2.0 Async, asyncpg, and Alembic migrations targeting PostgreSQL 16 + pgvector.
