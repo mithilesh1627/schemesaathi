@@ -1,9 +1,14 @@
 """Integration Tests for Document Ingestion Foundation & SHA-256 Deduplication."""
 
 import base64
+import hashlib
+from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
+
+from src.core.errors import StorageError
+from src.core.storage import get_storage_backend
 
 
 @pytest.mark.asyncio
@@ -177,3 +182,210 @@ async def test_ingest_document_invalid_base64_returns_400(async_client: AsyncCli
 
     response = await async_client.post("/api/v1/ingest/document", json=payload)
     assert response.status_code in [400, 422]
+
+
+@pytest.mark.asyncio
+async def test_ingest_document_persists_bytes_and_reads_back(
+    async_client: AsyncClient,
+) -> None:
+    """R1: Verify valid PDF bytes are physically persisted and byte-for-byte identical."""
+    scheme_id = "sch-persist-test-01"
+    await async_client.post(
+        "/api/v1/schemes/",
+        json={
+            "scheme_id": scheme_id,
+            "official_code": "PERSIST_TEST_01",
+            "title_en": "Persistence Test Scheme",
+            "issuing_level": "STATE_SECTOR",
+            "ministry_or_department": "Directorate of Education",
+            "implementing_agency": "Govt of Manipur",
+            "canonical_source_url": "https://example.gov.in",
+            "guidelines_document_url": "https://example.gov.in/doc.pdf",
+            "is_active": True,
+        },
+    )
+
+    doc_bytes = b"%PDF-1.4 Manipur Merit Scholarship Official Document Bytes 2024 %%EOF"
+    doc_sha = hashlib.sha256(doc_bytes).hexdigest()
+    doc_b64 = base64.b64encode(doc_bytes).decode("utf-8")
+
+    resp = await async_client.post(
+        "/api/v1/ingest/document",
+        json={
+            "scheme_id": scheme_id,
+            "academic_year": "2024-2025",
+            "source_url": "https://example.gov.in/doc.pdf",
+            "document_content_base64": doc_b64,
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["content_sha256"] == doc_sha
+    assert data["byte_size"] == len(doc_bytes)
+    assert data["lifecycle_state"] == "STORED"
+    storage_path = data["storage_path"]
+    assert storage_path.endswith(f"{doc_sha}.pdf")
+
+    # Read back from actual storage backend and verify byte-for-byte identity
+    storage = get_storage_backend()
+    stored_bytes = await storage.retrieve(storage_path)
+    assert stored_bytes == doc_bytes
+    assert hashlib.sha256(stored_bytes).hexdigest() == doc_sha
+
+
+@pytest.mark.asyncio
+async def test_ingest_duplicate_maintains_single_stored_object(
+    async_client: AsyncClient,
+) -> None:
+    """R1: Verify duplicate submission returns deduplication result and exactly 1 object in storage."""
+    scheme_id = "sch-single-storage-test"
+    await async_client.post(
+        "/api/v1/schemes/",
+        json={
+            "scheme_id": scheme_id,
+            "official_code": "SINGLE_STORE_01",
+            "title_en": "Single Storage Test Scheme",
+            "issuing_level": "STATE_SECTOR",
+            "ministry_or_department": "Directorate of Education",
+            "implementing_agency": "Govt of Manipur",
+            "canonical_source_url": "https://example.gov.in",
+            "guidelines_document_url": "https://example.gov.in/doc.pdf",
+            "is_active": True,
+        },
+    )
+
+    doc_bytes = b"%PDF-1.4 Single Stored Object Test File %%EOF"
+    doc_b64 = base64.b64encode(doc_bytes).decode("utf-8")
+    payload = {
+        "scheme_id": scheme_id,
+        "academic_year": "2024-2025",
+        "source_url": "https://example.gov.in/doc.pdf",
+        "document_content_base64": doc_b64,
+    }
+
+    # First ingestion
+    resp1 = await async_client.post("/api/v1/ingest/document", json=payload)
+    assert resp1.status_code == 200
+    assert resp1.json()["is_duplicate"] is False
+
+    # Second identical ingestion
+    resp2 = await async_client.post("/api/v1/ingest/document", json=payload)
+    assert resp2.status_code == 200
+    assert resp2.json()["is_duplicate"] is True
+    assert resp2.json()["deduplication_status"] == "DUPLICATE_IDENTICAL"
+
+    # Verify storage exists and is accessible
+    storage = get_storage_backend()
+    storage_path = resp1.json()["storage_path"]
+    assert await storage.exists(storage_path) is True
+
+
+@pytest.mark.asyncio
+async def test_ingest_storage_failure_fails_closed_and_leaves_no_orphan(
+    async_client: AsyncClient,
+) -> None:
+    """R1: Verify forced storage failure produces error response and leaves no registered record."""
+    scheme_id = "sch-fail-store-01"
+    await async_client.post(
+        "/api/v1/schemes/",
+        json={
+            "scheme_id": scheme_id,
+            "official_code": "FAIL_STORE_01",
+            "title_en": "Storage Failure Test Scheme",
+            "issuing_level": "STATE_SECTOR",
+            "ministry_or_department": "Directorate of Education",
+            "implementing_agency": "Govt of Manipur",
+            "canonical_source_url": "https://example.gov.in",
+            "guidelines_document_url": "https://example.gov.in/doc.pdf",
+            "is_active": True,
+        },
+    )
+
+    doc_bytes = b"%PDF-1.4 Storage Failure Test Document %%EOF"
+    doc_b64 = base64.b64encode(doc_bytes).decode("utf-8")
+
+    # Force storage.store to raise StorageError
+    with patch(
+        "src.core.storage.LocalStorageBackend.store",
+        side_effect=StorageError("Simulated disk unwritable / full"),
+    ):
+        resp = await async_client.post(
+            "/api/v1/ingest/document",
+            json={
+                "scheme_id": scheme_id,
+                "academic_year": "2024-2025",
+                "source_url": "https://example.gov.in/doc.pdf",
+                "document_content_base64": doc_b64,
+            },
+        )
+        assert resp.status_code == 500
+        data = resp.json()
+        assert data["error_code"] == "ERR_STORAGE_FAILURE"
+
+    # Verify no scheme version was registered for this scheme
+    detail_resp = await async_client.get(f"/api/v1/schemes/{scheme_id}")
+    assert detail_resp.status_code == 200
+    assert len(detail_resp.json()["versions"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_ingest_oversized_encoded_payload_rejected_with_413(
+    async_client: AsyncClient,
+) -> None:
+    """R2: Verify oversized encoded payload is rejected with HTTP 413 before decoding."""
+    # Construct base64 payload exceeding MAX_ENCODED_DOCUMENT_LENGTH (14,000,000 chars)
+    # Using 14,000,100 chars
+    oversized_b64 = "A" * 14_000_100
+
+    resp = await async_client.post(
+        "/api/v1/ingest/document",
+        json={
+            "scheme_id": "sch-any",
+            "academic_year": "2024-2025",
+            "source_url": "https://example.gov.in/doc.pdf",
+            "document_content_base64": oversized_b64,
+        },
+    )
+    assert resp.status_code == 413
+    data = resp.json()
+    assert data["error_code"] == "ERR_PAYLOAD_TOO_LARGE"
+
+
+@pytest.mark.asyncio
+async def test_ingest_oversized_decoded_payload_rejected_with_413(
+    async_client: AsyncClient,
+) -> None:
+    """R2: Verify decoded payload exceeding 10 MB is rejected with HTTP 413."""
+    scheme_id = "sch-oversized-decoded-01"
+    await async_client.post(
+        "/api/v1/schemes/",
+        json={
+            "scheme_id": scheme_id,
+            "official_code": "OVERSIZED_01",
+            "title_en": "Oversized Decoded Test Scheme",
+            "issuing_level": "STATE_SECTOR",
+            "ministry_or_department": "Directorate of Education",
+            "implementing_agency": "Govt of Manipur",
+            "canonical_source_url": "https://example.gov.in",
+            "guidelines_document_url": "https://example.gov.in/doc.pdf",
+            "is_active": True,
+        },
+    )
+
+    # 10 MB + 100 bytes (> 10,485,760 bytes)
+    oversized_bytes = b"%PDF-1.4 " + (b"0" * (10 * 1024 * 1024 + 100)) + b" %%EOF"
+    oversized_b64 = base64.b64encode(oversized_bytes).decode("utf-8")
+
+    resp = await async_client.post(
+        "/api/v1/ingest/document",
+        json={
+            "scheme_id": scheme_id,
+            "academic_year": "2024-2025",
+            "source_url": "https://example.gov.in/doc.pdf",
+            "document_content_base64": oversized_b64,
+        },
+    )
+    assert resp.status_code == 413
+    data = resp.json()
+    assert data["error_code"] == "ERR_PAYLOAD_TOO_LARGE"
+    assert "exceeds maximum allowed size" in data["message"]

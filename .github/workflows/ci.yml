@@ -100,8 +100,11 @@ jobs:
         env:
           ENVIRONMENT: testing
           DATABASE_URL: postgresql+asyncpg://schemesaathi:schemesaathi_test_password@localhost:5432/schemesaathi_test_db
+          POSTGRES_TEST_URL: postgresql+asyncpg://schemesaathi:schemesaathi_test_password@localhost:5432/schemesaathi_test_db
           REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: test-ci-secret-key-for-automated-runs
+          ADMIN_API_KEY: test-ci-admin-api-key-32charslong
+          CI: "true"
         run: |
           pytest --cov=src --cov-report=term-missing --cov-report=xml
 

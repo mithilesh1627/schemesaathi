@@ -47,3 +47,13 @@ class EvaluationStatus(enum.StrEnum):
     ELIGIBLE_OFF_CYCLE = "ELIGIBLE_OFF_CYCLE"
     CONDITIONALLY_ELIGIBLE = "CONDITIONALLY_ELIGIBLE"
     INELIGIBLE = "INELIGIBLE"
+
+
+class DocumentLifecycleState(enum.StrEnum):
+    """Lifecycle states of an ingested policy document."""
+
+    RECEIVED = "RECEIVED"
+    VALIDATED = "VALIDATED"
+    STORED = "STORED"
+    EXTRACTED = "EXTRACTED"
+    REVIEWED = "REVIEWED"

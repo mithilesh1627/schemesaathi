@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.core.config import settings
-from src.core.errors import InvalidStateError
+from src.core.errors import InvalidStateError, PayloadTooLargeError
 from src.modules.catalog.application.ingestion_service import IngestionService, compute_sha256
 from src.modules.catalog.application.schemas import DocumentIngestRequest
 from src.modules.catalog.domain.models import Scheme, SchemeVersion
@@ -41,7 +41,9 @@ def test_compute_sha256_different_content() -> None:
 async def test_ingestion_service_empty_bytes_raises_invalid_state() -> None:
     """Verify IngestionService rejects empty decoded content."""
     mock_session = AsyncMock()
-    service = IngestionService(mock_session)
+    mock_storage = AsyncMock()
+    mock_storage.store = AsyncMock(return_value="documents/mock.pdf")
+    service = IngestionService(mock_session, storage=mock_storage)
 
     # Empty base64 payload
     req = DocumentIngestRequest.model_construct(
@@ -59,7 +61,9 @@ async def test_ingestion_service_empty_bytes_raises_invalid_state() -> None:
 async def test_ingestion_service_invalid_base64_raises_invalid_state() -> None:
     """Verify IngestionService raises error on invalid base64 string."""
     mock_session = AsyncMock()
-    service = IngestionService(mock_session)
+    mock_storage = AsyncMock()
+    mock_storage.store = AsyncMock(return_value="documents/mock.pdf")
+    service = IngestionService(mock_session, storage=mock_storage)
 
     req = DocumentIngestRequest.model_construct(
         scheme_id="sch-test-01",
@@ -76,7 +80,9 @@ async def test_ingestion_service_invalid_base64_raises_invalid_state() -> None:
 async def test_ingestion_service_oversized_file_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify IngestionService rejects files exceeding MAX_INGESTION_FILE_SIZE_BYTES."""
     mock_session = AsyncMock()
-    service = IngestionService(mock_session)
+    mock_storage = AsyncMock()
+    mock_storage.store = AsyncMock(return_value="documents/mock.pdf")
+    service = IngestionService(mock_session, storage=mock_storage)
 
     monkeypatch.setattr(settings, "MAX_INGESTION_FILE_SIZE_BYTES", 50)
 
@@ -89,7 +95,31 @@ async def test_ingestion_service_oversized_file_rejected(monkeypatch: pytest.Mon
         document_content_base64=base64.b64encode(big_doc).decode("utf-8"),
     )
 
-    with pytest.raises(InvalidStateError, match="exceeds maximum allowed size"):
+    with pytest.raises(PayloadTooLargeError, match="exceeds maximum allowed size"):
+        await service.ingest_document(req)
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_oversized_encoded_payload_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify IngestionService rejects encoded strings exceeding MAX_ENCODED_DOCUMENT_LENGTH."""
+    mock_session = AsyncMock()
+    mock_storage = AsyncMock()
+    mock_storage.store = AsyncMock(return_value="documents/mock.pdf")
+    service = IngestionService(mock_session, storage=mock_storage)
+
+    monkeypatch.setattr(settings, "MAX_ENCODED_DOCUMENT_LENGTH", 100)
+
+    oversized_encoded = "A" * 150
+    req = DocumentIngestRequest.model_construct(
+        scheme_id="sch-test-01",
+        academic_year="2024-2025",
+        source_url="https://example.gov.in/oversized.pdf",
+        document_content_base64=oversized_encoded,
+    )
+
+    with pytest.raises(PayloadTooLargeError, match="exceeds maximum allowed length"):
         await service.ingest_document(req)
 
 
@@ -97,7 +127,9 @@ async def test_ingestion_service_oversized_file_rejected(monkeypatch: pytest.Mon
 async def test_ingestion_service_magic_bytes_check() -> None:
     """Verify IngestionService requires standard '%PDF-' magic bytes header."""
     mock_session = AsyncMock()
-    service = IngestionService(mock_session)
+    mock_storage = AsyncMock()
+    mock_storage.store = AsyncMock(return_value="documents/mock.pdf")
+    service = IngestionService(mock_session, storage=mock_storage)
 
     non_pdf = b"NOT_A_PDF_DOCUMENT_CONTENT %%EOF"
     req = DocumentIngestRequest.model_construct(
@@ -115,7 +147,9 @@ async def test_ingestion_service_magic_bytes_check() -> None:
 async def test_ingestion_service_missing_eof_check() -> None:
     """Verify IngestionService requires standard '%%EOF' trailer marker."""
     mock_session = AsyncMock()
-    service = IngestionService(mock_session)
+    mock_storage = AsyncMock()
+    mock_storage.store = AsyncMock(return_value="documents/mock.pdf")
+    service = IngestionService(mock_session, storage=mock_storage)
 
     truncated_pdf = b"%PDF-1.4 Valid Header but truncated before end of file marker..."
     req = DocumentIngestRequest.model_construct(
@@ -133,7 +167,9 @@ async def test_ingestion_service_missing_eof_check() -> None:
 async def test_ingestion_service_cross_scheme_reuse() -> None:
     """Verify IngestionService recognizes cross-scheme shared document sources."""
     mock_session = AsyncMock()
-    service = IngestionService(mock_session)
+    mock_storage = AsyncMock()
+    mock_storage.store = AsyncMock(return_value="documents/mock.pdf")
+    service = IngestionService(mock_session, storage=mock_storage)
 
     # Valid PDF
     doc = b"%PDF-1.4 Umbrella Ministry Guidelines 2024-2025 %%EOF"

@@ -23,6 +23,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON, TypeDecorator
 
 from src.modules.catalog.domain.enums import (
+    DocumentLifecycleState,
     EvaluationStatus,
     PortalType,
     PortalWindowStatus,
@@ -112,6 +113,11 @@ class SchemeVersion(Base):
         DateTime(timezone=True), default=utc_now, nullable=False
     )
     content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    storage_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    byte_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    lifecycle_state: Mapped[str] = mapped_column(
+        String(32), default=DocumentLifecycleState.STORED.value, nullable=False
+    )
     verification_status: Mapped[VerificationStatus] = mapped_column(
         Enum(VerificationStatus, name="verification_status_enum"),
         default=VerificationStatus.OFFICIAL_PROVISIONAL,

@@ -4,6 +4,7 @@ import os
 import socket
 import uuid
 from collections.abc import Iterator
+from urllib.parse import urlparse
 
 import pytest
 from sqlalchemy import select, text
@@ -30,25 +31,52 @@ from src.modules.catalog.domain.models import (
 
 PG_TEST_URL = os.getenv(
     "POSTGRES_TEST_URL",
-    "postgresql+asyncpg://schemesaathi:schemesaathi_password@127.0.0.1:5434/schemesaathi_db",
+    os.getenv(
+        "DATABASE_URL",
+        "postgresql+asyncpg://schemesaathi:schemesaathi_dev_password@localhost:5432/schemesaathi_db",
+    ),
 )
 
 
-def is_postgres_available() -> bool:
-    """Check if PostgreSQL 16 instance is reachable."""
+def check_postgres_availability() -> bool:
+    """Check if PostgreSQL 16 instance is reachable. In CI, failure to connect fails the test suite."""
+    host = "localhost"
+    port = 5432
+    try:
+        clean_url = PG_TEST_URL.replace("postgresql+asyncpg://", "http://").replace(
+            "postgresql://", "http://"
+        )
+        parsed = urlparse(clean_url)
+        if parsed.hostname:
+            host = parsed.hostname
+        if parsed.port:
+            port = parsed.port
+    except Exception:
+        pass
+
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(1.0)
-        res = sock.connect_ex(("127.0.0.1", 5434))
+        sock.settimeout(1.5)
+        res = sock.connect_ex((host, port))
         sock.close()
-        return res == 0
+        available = res == 0
     except Exception:
-        return False
+        available = False
+
+    is_ci = (
+        os.getenv("CI", "").lower() in ("true", "1")
+        or os.getenv("GITHUB_ACTIONS", "").lower() == "true"
+    )
+    if is_ci and not available:
+        pytest.fail(
+            f"PostgreSQL 16 + pgvector is REQUIRED in CI environment but connection to {host}:{port} failed!"
+        )
+    return available
 
 
 skip_if_no_pg = pytest.mark.skipif(
-    not is_postgres_available(),
-    reason="PostgreSQL 16 + pgvector instance on 127.0.0.1:5434 is not reachable",
+    not check_postgres_availability(),
+    reason="PostgreSQL 16 + pgvector instance is not reachable (local non-CI run)",
 )
 
 

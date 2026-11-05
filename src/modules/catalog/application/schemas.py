@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.core.config import settings
 from src.modules.catalog.domain.enums import (
     PortalType,
     PortalWindowStatus,
@@ -191,7 +192,10 @@ class DocumentIngestRequest(BaseModel):
     academic_year: str = Field(..., pattern=r"^20[2-3][0-9]-20[2-3][0-9]$", examples=["2024-2025"])
     source_url: str = Field(..., examples=["https://tahmanipur.gov.in/postmatric-st-2024.pdf"])
     document_content_base64: str = Field(
-        ..., min_length=16, description="Base64 encoded PDF / document content"
+        ...,
+        min_length=16,
+        max_length=settings.MAX_ENCODED_DOCUMENT_LENGTH,
+        description="Base64 encoded PDF / document content (max ~13.98 MB encoded length for 10 MB decoded limit)",
     )
     guideline_publication_date: date | None = None
     notes: str | None = None
@@ -211,4 +215,7 @@ class DocumentIngestResponse(BaseModel):
     version_id: uuid.UUID | None = None
     version_number: int | None = None
     ingested_at: datetime
+    storage_path: str | None = None
+    byte_size: int | None = None
+    lifecycle_state: str = "STORED"
     message: str

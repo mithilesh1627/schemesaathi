@@ -30,7 +30,11 @@ def test_cors_origins_parsing() -> None:
 
 def test_environment_flags() -> None:
     """Test environment status properties."""
-    prod_config = Settings(ENVIRONMENT="production")
+    prod_config = Settings(
+        ENVIRONMENT="production",
+        SECRET_KEY="valid-secure-production-secret-key-32chars",
+        ADMIN_API_KEY="valid-admin-api-key-32chars",
+    )
     assert prod_config.is_production
     assert not prod_config.is_testing
 

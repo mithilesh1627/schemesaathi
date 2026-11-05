@@ -8,6 +8,8 @@ from collections.abc import Awaitable, Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from src.core.config import settings
+from src.core.errors import build_error_response
 from src.core.logging import get_logger, request_id_ctx
 from src.core.security import redact_aadhaar_pii
 
@@ -56,3 +58,46 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
             return response
         finally:
             request_id_ctx.reset(token)
+
+
+class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+    """Enforces maximum incoming request body size to protect against memory exhaustion."""
+
+    def __init__(
+        self,
+        app: object,
+        max_body_bytes: int | None = None,
+    ) -> None:
+        super().__init__(app)  # type: ignore[arg-type]
+        self.max_body_bytes = max_body_bytes or settings.MAX_REQUEST_BODY_SIZE_BYTES
+
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        # Check Content-Length header before reading body
+        content_length_str = request.headers.get("content-length")
+        if content_length_str:
+            try:
+                content_length = int(content_length_str)
+                if content_length > self.max_body_bytes:
+                    logger.warning(
+                        "Rejected request exceeding body size limit: %d > %d",
+                        content_length,
+                        self.max_body_bytes,
+                    )
+                    return build_error_response(
+                        status_code=413,
+                        error_code="ERR_PAYLOAD_TOO_LARGE",
+                        message=(
+                            f"Request payload exceeds maximum allowed size of "
+                            f"{self.max_body_bytes} bytes."
+                        ),
+                        details={
+                            "content_length": content_length,
+                            "max_allowed": self.max_body_bytes,
+                        },
+                    )
+            except ValueError:
+                pass
+
+        return await call_next(request)

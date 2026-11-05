@@ -43,7 +43,7 @@ erDiagram
 
 ### 3.1 `schemes` & `scheme_versions` (Provenance & Version Control)
 - **Problem Solved:** Government scholarship guidelines change across academic sessions (e.g., income limits raised, quotas adjusted, OTR mandates introduced). If an evaluation references old rules, students face rejection.
-- **Design:** The `schemes` table stores invariant identity metadata (Ministry, Department, Official Code). The `scheme_versions` table stores academic-session specific guidelines (`2024-2025`, `2025-2026`), bound to the cryptographic `content_sha256` hash of the official government PDF.
+- **Design:** The `schemes` table stores invariant identity metadata (Ministry, Department, Official Code). The `scheme_versions` table stores academic-session specific guidelines (`2024-2025`, `2025-2026`), bound to the cryptographic `content_sha256` hash of the official government PDF, alongside physical `storage_path`, `byte_size`, and `lifecycle_state` (`RECEIVED` → `VALIDATED` → `STORED`).
 - **Constraint:** Unique constraint on `(scheme_id, version_number)` prevents silent in-place overwrite.
 
 ### 3.2 `scheme_eligibility_rules` (Deterministic AST Storage)

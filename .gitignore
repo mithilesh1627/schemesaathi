@@ -30,3 +30,8 @@ coverage.xml
 # OS files
 Thumbs.db
 Desktop.ini
+
+# Local data & storage
+data/
+documents/
+

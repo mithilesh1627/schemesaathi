@@ -68,6 +68,9 @@ CREATE TABLE scheme_versions (
     guideline_publication_date DATE,
     retrieved_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     content_sha256 CHAR(64) NOT NULL, -- Cryptographic hash of the source PDF/circular
+    storage_path VARCHAR(512), -- Deterministic safe storage location (e.g., 'documents/ab/abcdef...pdf')
+    byte_size INTEGER, -- Size in bytes of the persisted immutable original
+    lifecycle_state VARCHAR(32) NOT NULL DEFAULT 'STORED', -- Ingestion lifecycle (RECEIVED, VALIDATED, STORED)
     verification_status verification_status_enum NOT NULL DEFAULT 'OFFICIAL_PROVISIONAL',
     verified_by_user_id VARCHAR(64),
     verification_notes TEXT,

@@ -7,10 +7,14 @@ import asyncpg
 from alembic import command
 from alembic.config import Config
 
-DB_ASYNC_URL = (
-    "postgresql+asyncpg://schemesaathi:schemesaathi_password@127.0.0.1:5434/schemesaathi_db"
+DB_ASYNC_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+asyncpg://schemesaathi:schemesaathi_dev_password@127.0.0.1:5432/schemesaathi_db",
 )
-DB_RAW_URL = "postgresql://schemesaathi:schemesaathi_password@127.0.0.1:5434/schemesaathi_db"
+DB_RAW_URL = os.getenv(
+    "POSTGRES_RAW_URL",
+    "postgresql://schemesaathi:schemesaathi_dev_password@127.0.0.1:5432/schemesaathi_db",
+)
 
 os.environ["DATABASE_URL"] = DB_ASYNC_URL
 

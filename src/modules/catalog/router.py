@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db_session
+from src.core.dependencies import enforce_write_rate_limit, require_admin_key
 from src.core.errors import EntityNotFoundError, InvalidStateError
 from src.modules.catalog.application.ingestion_service import IngestionService
 from src.modules.catalog.application.schemas import (
@@ -148,6 +149,7 @@ async def get_scheme_by_id(
     response_model=SchemeDetailResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Register a New Scheme",
+    dependencies=[Depends(require_admin_key), Depends(enforce_write_rate_limit)],
 )
 async def create_scheme(
     payload: SchemeCreate,
@@ -215,6 +217,7 @@ async def get_source_registry() -> SourceRegistryResponse:
     response_model=DocumentIngestResponse,
     status_code=status.HTTP_200_OK,
     summary="Ingest Official Document with SHA-256 Deduplication",
+    dependencies=[Depends(require_admin_key), Depends(enforce_write_rate_limit)],
 )
 async def ingest_document(
     payload: DocumentIngestRequest,

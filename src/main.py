@@ -11,7 +11,7 @@ from src.core.config import settings
 from src.core.database import close_db_engine, get_engine
 from src.core.errors import register_exception_handlers
 from src.core.logging import get_logger, setup_logging
-from src.core.middleware import RequestIDMiddleware
+from src.core.middleware import RequestIDMiddleware, RequestSizeLimitMiddleware
 from src.core.redis import close_redis
 from src.modules.catalog.router import router as catalog_router
 
@@ -60,8 +60,9 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json" if not settings.is_production else None,
     )
 
-    # 1. Register Core Middleware (Request ID, Timing, CORS)
+    # 1. Register Core Middleware (Request ID, Size Limiter, CORS)
     app.add_middleware(RequestIDMiddleware)
+    app.add_middleware(RequestSizeLimitMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,

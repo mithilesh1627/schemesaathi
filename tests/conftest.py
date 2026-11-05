@@ -1,6 +1,7 @@
 """Pytest Fixtures and Test Environment Setup."""
 
 from collections.abc import AsyncGenerator
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
@@ -12,7 +13,10 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+import src.core.storage as storage_module
+from src.core.config import settings
 from src.core.database import get_db_session
+from src.core.storage import LocalStorageBackend
 from src.main import create_app
 from src.modules.catalog.domain.models import Base
 
@@ -57,9 +61,17 @@ async def db_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, N
 
 @pytest_asyncio.fixture
 async def async_client(
-    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> AsyncGenerator[AsyncClient, None]:
-    """Provide an async test client configured with the test database session."""
+    """Provide an async test client configured with the test database session and admin credentials."""
+    # Configure test admin key and isolated temporary storage directory
+    test_admin_key = "test-admin-key-for-unit-tests-1234"
+    monkeypatch.setattr(settings, "ADMIN_API_KEY", test_admin_key)
+    monkeypatch.setattr(settings, "STORAGE_BASE_DIR", str(tmp_path))
+
+    # Point default storage backend to temporary storage
+    test_storage = LocalStorageBackend(base_dir=tmp_path)
+    monkeypatch.setattr(storage_module, "_default_storage_backend", test_storage)
 
     # Ensure health checks report dependencies as healthy during API integration tests
     async def mock_redis_health() -> bool:
@@ -71,6 +83,30 @@ async def async_client(
     monkeypatch.setattr("src.api.health.check_redis_health", mock_redis_health)
     monkeypatch.setattr("src.api.health.check_database_health", mock_db_health)
 
+    # Mock Redis client for write rate limiting in tests
+    mock_redis_counts: dict[str, int] = {}
+
+    class TestMockRedis:
+        async def incr(self, key: str) -> int:
+            val = mock_redis_counts.get(key, 0) + 1
+            mock_redis_counts[key] = val
+            return val
+
+        async def expire(self, _key: str, _seconds: int) -> bool:
+            return True
+
+        async def ttl(self, _key: str) -> int:
+            return 60
+
+        async def ping(self) -> bool:
+            return True
+
+        async def aclose(self) -> None:
+            pass
+
+    test_redis = TestMockRedis()
+    monkeypatch.setattr("src.core.dependencies.get_redis_client", lambda: test_redis)
+
     app = create_app()
 
     # Override database dependency with test session
@@ -80,5 +116,8 @@ async def async_client(
     app.dependency_overrides[get_db_session] = override_get_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+    default_headers = {"X-Admin-API-Key": test_admin_key}
+    async with AsyncClient(
+        transport=transport, base_url="http://testserver", headers=default_headers
+    ) as client:
         yield client

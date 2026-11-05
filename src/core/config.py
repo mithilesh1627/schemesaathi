@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     # PostgreSQL Database Configuration
     DATABASE_URL: str = Field(
-        default="postgresql+asyncpg://schemesaathi:schemesaathi@localhost:5432/schemesaathi_db",
+        default="postgresql+asyncpg://schemesaathi:schemesaathi_dev_password@localhost:5432/schemesaathi_db",
         description="Async SQLAlchemy database connection URI",
     )
     DB_POOL_SIZE: int = Field(
@@ -50,11 +50,23 @@ class Settings(BaseSettings):
     DB_ECHO: bool = False
 
     # Ingestion & Document Guardrails
+    STORAGE_BASE_DIR: str = Field(
+        default="data/storage",
+        description="Base directory for immutable document storage",
+    )
     MAX_INGESTION_FILE_SIZE_BYTES: int = Field(
         default=10 * 1024 * 1024,
         ge=1024,
         le=50 * 1024 * 1024,
         description="Maximum permitted document upload size in bytes (default 10 MB)",
+    )
+    MAX_ENCODED_DOCUMENT_LENGTH: int = Field(
+        default=14_000_000,
+        description="Maximum length of base64 document payload string (~13.98 MB for 10 MB decoded)",
+    )
+    MAX_REQUEST_BODY_SIZE_BYTES: int = Field(
+        default=15 * 1024 * 1024,
+        description="Maximum raw HTTP request body size in bytes before middleware rejection (default 15 MB)",
     )
 
     # Redis Configuration
@@ -71,6 +83,10 @@ class Settings(BaseSettings):
         default="insecure-development-secret-key-change-in-production-env",
         description="Cryptographic secret key for signing tokens",
     )
+    ADMIN_API_KEY: str | None = Field(
+        default=None,
+        description="Administrative secret API key for write endpoints (must be set in environment)",
+    )
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -80,6 +96,28 @@ class Settings(BaseSettings):
         if isinstance(v, list):
             return v
         return ["*"]
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        """Fail safe: enforce strict security configuration in production mode."""
+        if self.is_production:
+            if self.DEBUG:
+                raise ValueError("DEBUG must be False in production environment.")
+            if (
+                not self.SECRET_KEY
+                or self.SECRET_KEY == "insecure-development-secret-key-change-in-production-env"
+                or len(self.SECRET_KEY) < 32
+            ):
+                raise ValueError(
+                    "SECRET_KEY must be a cryptographically secure random token (>= 32 chars) in production."
+                )
+            if not self.ADMIN_API_KEY or len(self.ADMIN_API_KEY) < 16:
+                raise ValueError(
+                    "ADMIN_API_KEY must be configured and >= 16 characters in production environment."
+                )
+            if "sqlite" in self.DATABASE_URL.lower():
+                raise ValueError("SQLite is strictly forbidden in production environment.")
+        return self
 
     @property
     def is_production(self) -> bool:

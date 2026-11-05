@@ -34,12 +34,14 @@ class SchemeSaathiError(Exception):
         error_code: str = "ERR_INTERNAL_ERROR",
         status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
         details: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
         self.error_code = error_code
         self.status_code = status_code
         self.details = details or {}
+        self.headers = headers or {}
 
 
 class EntityNotFoundError(SchemeSaathiError):
@@ -90,6 +92,68 @@ class StatutoryRuleValidationError(SchemeSaathiError):
         )
 
 
+class AuthenticationError(SchemeSaathiError):
+    """Raised when client is unauthenticated."""
+
+    def __init__(self, message: str = "Authentication credentials were not provided.") -> None:
+        super().__init__(
+            message=message,
+            error_code="ERR_UNAUTHENTICATED",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+class AuthorizationError(SchemeSaathiError):
+    """Raised when client lacks permission to access resource."""
+
+    def __init__(
+        self, message: str = "Access denied: insufficient administrative permissions."
+    ) -> None:
+        super().__init__(
+            message=message,
+            error_code="ERR_FORBIDDEN",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+
+class PayloadTooLargeError(SchemeSaathiError):
+    """Raised when request payload or document exceeds configured size limits."""
+
+    def __init__(self, message: str, details: dict[str, Any] | None = None) -> None:
+        super().__init__(
+            message=message,
+            error_code="ERR_PAYLOAD_TOO_LARGE",
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            details=details,
+        )
+
+
+class RateLimitExceededError(SchemeSaathiError):
+    """Raised when client exceeds rate limit thresholds."""
+
+    def __init__(self, retry_after: int | str = 60) -> None:
+        super().__init__(
+            message=f"Rate limit exceeded. Please retry after {retry_after} seconds.",
+            error_code="ERR_RATE_LIMIT_EXCEEDED",
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            headers={"Retry-After": str(retry_after)},
+            details={"retry_after_seconds": int(retry_after)},
+        )
+
+
+class StorageError(SchemeSaathiError):
+    """Raised when document persistence or retrieval fails."""
+
+    def __init__(self, message: str, details: dict[str, Any] | None = None) -> None:
+        super().__init__(
+            message=message,
+            error_code="ERR_STORAGE_FAILURE",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=details,
+        )
+
+
 class ServiceUnavailableError(SchemeSaathiError):
     """Raised when an external dependency (Database, Redis) is unavailable."""
 
@@ -107,6 +171,7 @@ def build_error_response(
     error_code: str,
     message: str,
     details: Any = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     """Build a standardized RFC-7807 compliant JSONResponse with PII scrubbing."""
     req_id = request_id_ctx.get()
@@ -118,7 +183,7 @@ def build_error_response(
         details=safe_details,
         request_id=req_id,
     )
-    return JSONResponse(status_code=status_code, content=envelope.model_dump())
+    return JSONResponse(status_code=status_code, content=envelope.model_dump(), headers=headers)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -138,6 +203,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             error_code=exc.error_code,
             message=exc.message,
             details=exc.details,
+            headers=exc.headers,
         )
 
     @app.exception_handler(RequestValidationError)
@@ -145,6 +211,20 @@ def register_exception_handlers(app: FastAPI) -> None:
         _request: Request, exc: RequestValidationError
     ) -> JSONResponse:
         logger.warning("Request schema validation failed: %s", exc.errors())
+        # Check if error is due to payload size limit
+        for err in exc.errors():
+            loc_str = str(err.get("loc", ()))
+            err_type = str(err.get("type", ""))
+            if "document_content_base64" in loc_str and (
+                "too_long" in err_type or "value_error" in err_type
+            ):
+                return build_error_response(
+                    status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                    error_code="ERR_PAYLOAD_TOO_LARGE",
+                    message="Encoded document content exceeds maximum allowed length.",
+                    details=exc.errors(),
+                )
+
         return build_error_response(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             error_code="ERR_VALIDATION_FAILED",
