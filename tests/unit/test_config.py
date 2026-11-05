@@ -9,9 +9,11 @@ def test_default_settings() -> None:
     assert config.PROJECT_NAME == "SchemeSaathi"
     assert config.API_V1_PREFIX == "/api/v1"
     assert config.ENVIRONMENT in ["development", "testing", "staging", "production"]
-    assert config.DB_POOL_SIZE == 20
-    assert config.DB_MAX_OVERFLOW == 10
+    assert config.DB_POOL_SIZE == 10
+    assert config.DB_MAX_OVERFLOW == 5
     assert config.REDIS_MAX_CONNECTIONS == 20
+    assert config.CORS_ALLOW_CREDENTIALS is True
+    assert "http://localhost:3000" in config.CORS_ORIGINS
     assert not config.is_production
 
 

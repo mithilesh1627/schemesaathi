@@ -33,13 +33,16 @@ def test_redact_valid_aadhaar_numbers() -> None:
 
 
 def test_redact_aadhaar_preserves_regular_numbers() -> None:
-    """Ensure 10-digit phone numbers, 6-digit PIN codes, and invalid 12-digit numbers are untouched."""
-    text = "Student phone: 9876543210, PIN code: 795001, Year: 2024, Invalid UID: 9999 8888 7770"
+    """Ensure 10-digit phone numbers, 6-digit PIN codes, and dates are untouched while 12-digits are redacted."""
+    text = (
+        "Student phone: 9876543210, PIN code: 795001, Year: 2024, Aadhaar sequence: 9999 8888 7770"
+    )
     scrubbed = redact_aadhaar_pii(text)
-    assert scrubbed == text
+    assert "[REDACTED_AADHAAR]" in scrubbed
     assert "9876543210" in scrubbed
     assert "795001" in scrubbed
-    assert "9999 8888 7770" in scrubbed
+    assert "2024" in scrubbed
+    assert "9999 8888 7770" not in scrubbed
 
 
 def test_redact_aadhaar_empty_string() -> None:

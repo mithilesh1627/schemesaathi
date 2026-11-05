@@ -67,6 +67,34 @@ def test_production_fails_safe_with_sqlite_database() -> None:
         )
 
 
+def test_production_fails_safe_with_wildcard_cors_and_credentials() -> None:
+    """Verify production settings fail validation if wildcard CORS is used with credentials."""
+    with pytest.raises(
+        ValueError,
+        match="CORS_ORIGINS cannot contain wildcard '\\*' when CORS_ALLOW_CREDENTIALS is True",
+    ):
+        Settings(
+            ENVIRONMENT="production",
+            DEBUG=False,
+            ADMIN_API_KEY="super-secret-admin-key-32chars",
+            SECRET_KEY="a-very-long-and-secure-random-token-for-production-use",
+            DATABASE_URL="postgresql+asyncpg://schemesaathi:strongpass@prod-db:5432/schemesaathi_db",
+            CORS_ORIGINS=["*"],
+            CORS_ALLOW_CREDENTIALS=True,
+        )
+
+
+def test_development_allows_wildcard_cors() -> None:
+    """Verify development settings permit wildcard CORS for rapid local testing."""
+    dev_settings = Settings(
+        ENVIRONMENT="development",
+        CORS_ORIGINS=["*"],
+        CORS_ALLOW_CREDENTIALS=True,
+    )
+    assert dev_settings.CORS_ORIGINS == ["*"]
+    assert dev_settings.CORS_ALLOW_CREDENTIALS is True
+
+
 def test_production_valid_configuration_succeeds() -> None:
     """Verify production settings succeed when fully and safely configured."""
     settings = Settings(
@@ -75,6 +103,8 @@ def test_production_valid_configuration_succeeds() -> None:
         ADMIN_API_KEY="secure-production-admin-api-key-32chars",
         SECRET_KEY="secure-production-jwt-signing-secret-key-64charslong1234567890",
         DATABASE_URL="postgresql+asyncpg://prod_user:strongpassword123@prod-cluster:5432/schemesaathi_prod",
+        CORS_ORIGINS=["https://schemesaathi.in", "https://admin.schemesaathi.in"],
+        CORS_ALLOW_CREDENTIALS=True,
     )
     assert settings.is_production is True
     assert settings.DEBUG is False

@@ -1,6 +1,7 @@
 """Async Database Repositories for Scheme Catalog."""
 
-from sqlalchemy import Text, cast, func, or_, select
+from sqlalchemy import Text, and_, cast, func, or_, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -56,49 +57,121 @@ class SchemeRepository:
             count_stmt = count_stmt.where(Scheme.issuing_level == issuing_level)
 
         has_rule_filter = bool(category or domicile or course_level)
-        if has_rule_filter:
-            stmt = stmt.join(Scheme.versions).join(SchemeVersion.eligibility_rule)
-            count_stmt = count_stmt.join(Scheme.versions).join(SchemeVersion.eligibility_rule)
+        needs_latest_version = has_rule_filter or (portal_status is not None)
 
-            if category:
-                cat_clause = or_(
-                    cast(SchemeEligibilityRule.target_categories, Text).like(f'%"{category}"%'),
-                    cast(SchemeEligibilityRule.target_categories, Text).like('%"ALL"%'),
+        if needs_latest_version:
+            # Subquery partitioning by scheme_id to resolve the single latest version
+            latest_subq = select(
+                SchemeVersion.version_id.label("latest_version_id"),
+                SchemeVersion.scheme_id.label("sub_scheme_id"),
+                func.row_number()
+                .over(
+                    partition_by=SchemeVersion.scheme_id,
+                    order_by=SchemeVersion.version_number.desc(),
                 )
-                stmt = stmt.where(cat_clause)
-                count_stmt = count_stmt.where(cat_clause)
+                .label("rn"),
+            ).subquery("latest_version_subq")
 
-            if domicile:
-                dom_clause = or_(
-                    cast(SchemeEligibilityRule.eligible_domiciles, Text).like(f'%"{domicile}"%'),
-                    cast(SchemeEligibilityRule.eligible_domiciles, Text).like('%"ALL_INDIA"%'),
-                )
-                stmt = stmt.where(dom_clause)
-                count_stmt = count_stmt.where(dom_clause)
-
-            if course_level:
-                course_clause = or_(
-                    cast(SchemeEligibilityRule.eligible_course_levels, Text).like(
-                        f'%"{course_level}"%'
-                    ),
-                    cast(SchemeEligibilityRule.eligible_course_levels, Text).like('%"ALL"%'),
-                )
-                stmt = stmt.where(course_clause)
-                count_stmt = count_stmt.where(course_clause)
-
-        if portal_status:
-            if not has_rule_filter:
-                stmt = stmt.join(Scheme.versions)
-                count_stmt = count_stmt.join(Scheme.versions)
-            stmt = stmt.join(SchemeVersion.application_window).where(
-                SchemeApplicationWindow.portal_status == portal_status
+            stmt = stmt.join(
+                latest_subq,
+                and_(
+                    latest_subq.c.sub_scheme_id == Scheme.scheme_id,
+                    latest_subq.c.rn == 1,
+                ),
             )
-            count_stmt = count_stmt.join(SchemeVersion.application_window).where(
-                SchemeApplicationWindow.portal_status == portal_status
+            count_stmt = count_stmt.join(
+                latest_subq,
+                and_(
+                    latest_subq.c.sub_scheme_id == Scheme.scheme_id,
+                    latest_subq.c.rn == 1,
+                ),
             )
 
-        if has_rule_filter or portal_status:
-            stmt = stmt.distinct()
+            if has_rule_filter:
+                stmt = stmt.join(
+                    SchemeEligibilityRule,
+                    SchemeEligibilityRule.version_id == latest_subq.c.latest_version_id,
+                )
+                count_stmt = count_stmt.join(
+                    SchemeEligibilityRule,
+                    SchemeEligibilityRule.version_id == latest_subq.c.latest_version_id,
+                )
+
+                is_postgres = (
+                    self.session.bind is not None and "postgresql" in self.session.bind.dialect.name
+                )
+
+                if category:
+                    if is_postgres:
+                        cat_clause = or_(
+                            cast(SchemeEligibilityRule.target_categories, JSONB).contains(
+                                [category]
+                            ),
+                            cast(SchemeEligibilityRule.target_categories, JSONB).contains(["ALL"]),
+                        )
+                    else:
+                        cat_clause = or_(
+                            cast(SchemeEligibilityRule.target_categories, Text).like(
+                                f'%"{category}"%'
+                            ),
+                            cast(SchemeEligibilityRule.target_categories, Text).like('%"ALL"%'),
+                        )
+                    stmt = stmt.where(cat_clause)
+                    count_stmt = count_stmt.where(cat_clause)
+
+                if domicile:
+                    if is_postgres:
+                        dom_clause = or_(
+                            cast(SchemeEligibilityRule.eligible_domiciles, JSONB).contains(
+                                [domicile]
+                            ),
+                            cast(SchemeEligibilityRule.eligible_domiciles, JSONB).contains(
+                                ["ALL_INDIA"]
+                            ),
+                        )
+                    else:
+                        dom_clause = or_(
+                            cast(SchemeEligibilityRule.eligible_domiciles, Text).like(
+                                f'%"{domicile}"%'
+                            ),
+                            cast(SchemeEligibilityRule.eligible_domiciles, Text).like(
+                                '%"ALL_INDIA"%'
+                            ),
+                        )
+                    stmt = stmt.where(dom_clause)
+                    count_stmt = count_stmt.where(dom_clause)
+
+                if course_level:
+                    if is_postgres:
+                        course_clause = or_(
+                            cast(SchemeEligibilityRule.eligible_course_levels, JSONB).contains(
+                                [course_level]
+                            ),
+                            cast(SchemeEligibilityRule.eligible_course_levels, JSONB).contains(
+                                ["ALL"]
+                            ),
+                        )
+                    else:
+                        course_clause = or_(
+                            cast(SchemeEligibilityRule.eligible_course_levels, Text).like(
+                                f'%"{course_level}"%'
+                            ),
+                            cast(SchemeEligibilityRule.eligible_course_levels, Text).like(
+                                '%"ALL"%'
+                            ),
+                        )
+                    stmt = stmt.where(course_clause)
+                    count_stmt = count_stmt.where(course_clause)
+
+            if portal_status:
+                stmt = stmt.join(
+                    SchemeApplicationWindow,
+                    SchemeApplicationWindow.version_id == latest_subq.c.latest_version_id,
+                ).where(SchemeApplicationWindow.portal_status == portal_status)
+                count_stmt = count_stmt.join(
+                    SchemeApplicationWindow,
+                    SchemeApplicationWindow.version_id == latest_subq.c.latest_version_id,
+                ).where(SchemeApplicationWindow.portal_status == portal_status)
 
         stmt = stmt.options(
             selectinload(Scheme.versions).selectinload(SchemeVersion.eligibility_rule),

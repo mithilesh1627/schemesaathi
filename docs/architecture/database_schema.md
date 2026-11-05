@@ -102,8 +102,8 @@ PostgreSQL connection management is critical for high-concurrency civic portal t
 
 | Parameter | Environment Variable | Default Value | Description |
 | :--- | :--- | :--- | :--- |
-| **Base Pool Size** | `DB_POOL_SIZE` | `20` | Base persistent open connections maintained per Uvicorn worker process. |
-| **Max Overflow** | `DB_MAX_OVERFLOW` | `10` | Temporary burst connections opened above base pool during traffic surges. |
+| **Base Pool Size** | `DB_POOL_SIZE` | `10` | Base persistent open connections maintained per Uvicorn worker process. |
+| **Max Overflow** | `DB_MAX_OVERFLOW` | `5` | Temporary burst connections opened above base pool during traffic surges per worker. |
 | **Pool Timeout** | `DB_POOL_TIMEOUT` | `30.0` (sec) | Maximum wait time for a connection to become available before raising `TimeoutError`. |
 | **Pool Recycle** | `DB_POOL_RECYCLE` | `1800` (sec) | Maximum age of connection before automated recycling (prevents silent socket drops by cloud load balancers). |
 | **Statement Timeout** | `DB_STATEMENT_TIMEOUT_MS` | `30000` (ms) | PostgreSQL server-side execution timeout to terminate runaway queries. |
@@ -114,12 +114,12 @@ PostgreSQL connection management is critical for high-concurrency civic portal t
 The total concurrent connections demanded from PostgreSQL is calculated as:
 $$\text{Max DB Connections} = N_{\text{workers}} \times (\text{DB\_POOL\_SIZE} + \text{DB\_MAX\_OVERFLOW})$$
 
-For the default production baseline:
-- $N_{\text{workers}} = 4$ Uvicorn processes
-- $\text{DB\_POOL\_SIZE} = 20$
-- $\text{DB\_MAX\_OVERFLOW} = 10$
-- $\text{Max Connections} = 4 \times (20 + 10) = 120\text{ connections}$
+For the default container runtime baseline (configured in `Dockerfile` and `docker-compose.yml`):
+- $N_{\text{workers}} = 2$ Uvicorn processes
+- $\text{DB\_POOL\_SIZE} = 10$
+- $\text{DB\_MAX\_OVERFLOW} = 5$
+- $\text{Max Connections} = 2 \times (10 + 5) = 30\text{ connections}$
 
 **Database Sizing Requirement:**
-The PostgreSQL `postgresql.conf` setting `max_connections` MUST be configured to at least **150** (allowing 120 application connections + 30 reserved connections for migrations, background workers, and PostgreSQL superuser administration).
+The PostgreSQL `postgresql.conf` setting `max_connections` MUST be configured to at least **60** (allowing 30 application connections + 30 reserved connections for migrations, background workers, and PostgreSQL superuser administration). In high-concurrency 4-worker deployments, setting `DB_POOL_SIZE=10` and `DB_MAX_OVERFLOW=5` yields 60 application connections, requiring `max_connections >= 100`.
 

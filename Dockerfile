@@ -20,8 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv for deterministic dependency resolution
 COPY --from=ghcr.io/astral-sh/uv:0.5.26 /uv /bin/uv
 
-# Copy dependency specifications
+# Copy dependency specifications and source tree
 COPY pyproject.toml README.md ./
+COPY src/ ./src/
 
 # Create virtual environment and install production dependencies
 RUN uv venv /opt/venv && \
@@ -46,6 +47,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create dedicated non-root application user
 RUN groupadd -g 1001 schemesaathi && \
     useradd -u 1001 -g schemesaathi -s /bin/bash -m schemesaathi
+
+# Create storage directory with non-root ownership
+RUN mkdir -p /app/data/storage && \
+    chown -R schemesaathi:schemesaathi /app/data
 
 # Copy pre-built virtual environment from builder stage
 COPY --from=builder --chown=schemesaathi:schemesaathi /opt/venv /opt/venv

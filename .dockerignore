@@ -13,3 +13,6 @@ htmlcov
 tests
 docs
 *.log
+data
+documents
+coverage.xml

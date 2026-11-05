@@ -60,21 +60,18 @@ def validate_verhoeff(num_str: str) -> bool:
 
 
 def redact_aadhaar_pii(text: str) -> str:
-    """Detect and redact any 12-digit number sequence validating as an Aadhaar number.
+    """Detect and unconditionally redact any prospective 12-digit number sequence.
 
-    Replaces verified numbers with [REDACTED_AADHAAR] in compliance with Zero-Aadhaar policy.
+    Under SchemeSaathi's Zero-Aadhaar policy and DPDP Act 2023 alignment, redaction is
+    unconditional: any 12-digit sequence (with or without spaces/hyphens) is aggressively
+    redacted to [REDACTED_AADHAAR] regardless of whether it satisfies the Verhoeff check digit.
+    This guarantees that malformed numbers or typographical errors cannot leak into logs,
+    telemetry, exceptions, or error responses.
     """
     if not text:
         return text
 
-    def _replace_match(match: re.Match[str]) -> str:
-        matched_str = match.group(0)
-        clean_digits = re.sub(r"\D", "", matched_str)
-        if len(clean_digits) == 12 and validate_verhoeff(clean_digits):
-            return "[REDACTED_AADHAAR]"
-        return matched_str
-
-    return AADHAAR_PATTERN.sub(_replace_match, text)
+    return AADHAAR_PATTERN.sub("[REDACTED_AADHAAR]", text)
 
 
 def sanitize_sensitive_data(val: Any) -> Any:

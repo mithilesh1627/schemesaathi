@@ -227,3 +227,186 @@ async def test_catalog_filtering_and_nested_statutory_data(
     assert v["eligibility_rule"]["income_ceiling_annual_inr"] == 250000.0
     assert "ST" in v["eligibility_rule"]["target_categories"]
     assert v["application_window"]["portal_status"] == "OPEN"
+
+
+@pytest.mark.asyncio
+async def test_catalog_filtering_restricts_to_latest_version(
+    async_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """Verify catalog filters apply strictly to the LATEST version of each scheme (Work Item R8).
+
+    - Scheme 1: v1 had CLOSED window and GENERAL category; v2 (latest) has OPEN window and ST category.
+    - Scheme 2: v1 had OPEN window and ST category; v2 (latest) has CLOSED window and OBC category.
+
+    Filtering for portal_status=OPEN must return Scheme 1, NOT Scheme 2.
+    Filtering for portal_status=CLOSED must return Scheme 2, NOT Scheme 1.
+    Filtering for category=ST must return Scheme 1, NOT Scheme 2.
+    Filtering for category=OBC must return Scheme 2, NOT Scheme 1.
+    """
+    # 1. Seed Scheme 1 (v1 CLOSED -> v2 OPEN)
+    scheme_1 = Scheme(
+        scheme_id="sch-mv-01",
+        official_code="MV_SCH_01",
+        title_en="Multi-Version Scheme 1 (Now Open)",
+        issuing_level=SchemeLevel.STATE_SECTOR,
+        ministry_or_department="Tribal Affairs Manipur",
+        implementing_agency="Govt of Manipur",
+        canonical_source_url="https://example.gov.in/sch1",
+        guidelines_document_url="https://example.gov.in/sch1.pdf",
+        is_active=True,
+    )
+    db_session.add(scheme_1)
+    await db_session.flush()
+
+    v1_s1 = SchemeVersion(
+        scheme_id=scheme_1.scheme_id,
+        version_number=1,
+        academic_year="2023-2024",
+        content_sha256="1" * 64,
+        verification_status=VerificationStatus.OFFICIAL_VERIFIED,
+    )
+    db_session.add(v1_s1)
+    await db_session.flush()
+    db_session.add(
+        SchemeEligibilityRule(
+            version_id=v1_s1.version_id,
+            target_categories=["GENERAL"],
+            eligible_genders=["ANY"],
+            eligible_domiciles=["ALL_INDIA"],
+            eligible_course_levels=["UNDERGRADUATE"],
+            ast_rule_logic={"==": [1, 1]},
+            rule_description_en="Old v1 rule",
+        )
+    )
+    db_session.add(
+        SchemeApplicationWindow(
+            version_id=v1_s1.version_id,
+            portal_type=PortalType.STATE_DIRECT_PORTAL,
+            portal_url="https://example.gov.in/old",
+            portal_status=PortalWindowStatus.CLOSED,
+        )
+    )
+
+    v2_s1 = SchemeVersion(
+        scheme_id=scheme_1.scheme_id,
+        version_number=2,
+        academic_year="2024-2025",
+        content_sha256="2" * 64,
+        verification_status=VerificationStatus.OFFICIAL_VERIFIED,
+    )
+    db_session.add(v2_s1)
+    await db_session.flush()
+    db_session.add(
+        SchemeEligibilityRule(
+            version_id=v2_s1.version_id,
+            target_categories=["ST"],
+            eligible_genders=["ANY"],
+            eligible_domiciles=["MANIPUR"],
+            eligible_course_levels=["UNDERGRADUATE"],
+            ast_rule_logic={"==": [1, 1]},
+            rule_description_en="New v2 ST rule",
+        )
+    )
+    db_session.add(
+        SchemeApplicationWindow(
+            version_id=v2_s1.version_id,
+            portal_type=PortalType.STATE_DIRECT_PORTAL,
+            portal_url="https://example.gov.in/new",
+            portal_status=PortalWindowStatus.OPEN,
+        )
+    )
+
+    # 2. Seed Scheme 2 (v1 OPEN -> v2 CLOSED)
+    scheme_2 = Scheme(
+        scheme_id="sch-mv-02",
+        official_code="MV_SCH_02",
+        title_en="Multi-Version Scheme 2 (Now Closed)",
+        issuing_level=SchemeLevel.STATE_SECTOR,
+        ministry_or_department="OBC Directorate Manipur",
+        implementing_agency="Govt of Manipur",
+        canonical_source_url="https://example.gov.in/sch2",
+        guidelines_document_url="https://example.gov.in/sch2.pdf",
+        is_active=True,
+    )
+    db_session.add(scheme_2)
+    await db_session.flush()
+
+    v1_s2 = SchemeVersion(
+        scheme_id=scheme_2.scheme_id,
+        version_number=1,
+        academic_year="2023-2024",
+        content_sha256="3" * 64,
+        verification_status=VerificationStatus.OFFICIAL_VERIFIED,
+    )
+    db_session.add(v1_s2)
+    await db_session.flush()
+    db_session.add(
+        SchemeEligibilityRule(
+            version_id=v1_s2.version_id,
+            target_categories=["ST"],
+            eligible_genders=["ANY"],
+            eligible_domiciles=["MANIPUR"],
+            eligible_course_levels=["UNDERGRADUATE"],
+            ast_rule_logic={"==": [1, 1]},
+            rule_description_en="Old v1 rule ST",
+        )
+    )
+    db_session.add(
+        SchemeApplicationWindow(
+            version_id=v1_s2.version_id,
+            portal_type=PortalType.STATE_DIRECT_PORTAL,
+            portal_url="https://example.gov.in/old2",
+            portal_status=PortalWindowStatus.OPEN,
+        )
+    )
+
+    v2_s2 = SchemeVersion(
+        scheme_id=scheme_2.scheme_id,
+        version_number=2,
+        academic_year="2024-2025",
+        content_sha256="4" * 64,
+        verification_status=VerificationStatus.OFFICIAL_VERIFIED,
+    )
+    db_session.add(v2_s2)
+    await db_session.flush()
+    db_session.add(
+        SchemeEligibilityRule(
+            version_id=v2_s2.version_id,
+            target_categories=["OBC"],
+            eligible_genders=["ANY"],
+            eligible_domiciles=["MANIPUR"],
+            eligible_course_levels=["UNDERGRADUATE"],
+            ast_rule_logic={"==": [1, 1]},
+            rule_description_en="New v2 rule OBC",
+        )
+    )
+    db_session.add(
+        SchemeApplicationWindow(
+            version_id=v2_s2.version_id,
+            portal_type=PortalType.STATE_DIRECT_PORTAL,
+            portal_url="https://example.gov.in/new2",
+            portal_status=PortalWindowStatus.CLOSED,
+        )
+    )
+    await db_session.commit()
+
+    # Query 1: Filter portal_status=OPEN
+    resp_open = await async_client.get("/api/v1/schemes/catalog?portal_status=OPEN")
+    assert resp_open.status_code == 200
+    open_ids = [it["scheme_id"] for it in resp_open.json()["items"]]
+    assert "sch-mv-01" in open_ids
+    assert "sch-mv-02" not in open_ids
+
+    # Query 2: Filter portal_status=CLOSED
+    resp_closed = await async_client.get("/api/v1/schemes/catalog?portal_status=CLOSED")
+    assert resp_closed.status_code == 200
+    closed_ids = [it["scheme_id"] for it in resp_closed.json()["items"]]
+    assert "sch-mv-02" in closed_ids
+    assert "sch-mv-01" not in closed_ids
+
+    # Query 3: Filter category=OBC
+    resp_obc = await async_client.get("/api/v1/schemes/catalog?category=OBC")
+    assert resp_obc.status_code == 200
+    obc_ids = [it["scheme_id"] for it in resp_obc.json()["items"]]
+    assert "sch-mv-02" in obc_ids
+    assert "sch-mv-01" not in obc_ids

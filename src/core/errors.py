@@ -1,5 +1,6 @@
 """Centralized Domain Exceptions and Error Handlers."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -186,6 +187,35 @@ def build_error_response(
     return JSONResponse(status_code=status_code, content=envelope.model_dump(), headers=headers)
 
 
+def sanitize_validation_errors(errors: Sequence[Any]) -> list[dict[str, Any]]:
+    """Sanitize Pydantic validation errors by stripping raw input payloads and scrubbing PII.
+
+    Pydantic validation errors contain the submitted raw input in the 'input' key,
+    which can leak large Base64 document bodies, authentication tokens, or citizen PII.
+    This sanitizer strips 'input' entirely and ensures messages and context fields are redacted.
+    """
+    sanitized: list[dict[str, Any]] = []
+    for err in errors:
+        if not isinstance(err, dict):
+            continue
+        clean_err: dict[str, Any] = {
+            "loc": list(err.get("loc", ())),
+            "msg": sanitize_sensitive_data(str(err.get("msg", ""))),
+            "type": str(err.get("type", "")),
+        }
+        if "ctx" in err and isinstance(err["ctx"], dict):
+            # Keep safe numeric/string bounds (e.g. limit_value) but omit raw inputs
+            clean_ctx = {
+                k: sanitize_sensitive_data(v)
+                for k, v in err["ctx"].items()
+                if k not in ("input", "raw")
+            }
+            if clean_ctx:
+                clean_err["ctx"] = clean_ctx
+        sanitized.append(clean_err)
+    return sanitized
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Register centralized error handlers on the FastAPI application."""
 
@@ -210,7 +240,8 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def handle_validation_error(
         _request: Request, exc: RequestValidationError
     ) -> JSONResponse:
-        logger.warning("Request schema validation failed: %s", exc.errors())
+        sanitized_details = sanitize_validation_errors(exc.errors())
+        logger.warning("Request schema validation failed: %s", sanitized_details)
         # Check if error is due to payload size limit
         for err in exc.errors():
             loc_str = str(err.get("loc", ()))
@@ -222,14 +253,14 @@ def register_exception_handlers(app: FastAPI) -> None:
                     status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                     error_code="ERR_PAYLOAD_TOO_LARGE",
                     message="Encoded document content exceeds maximum allowed length.",
-                    details=exc.errors(),
+                    details=sanitized_details,
                 )
 
         return build_error_response(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             error_code="ERR_VALIDATION_FAILED",
             message="Request parameters or body failed schema validation.",
-            details=exc.errors(),
+            details=sanitized_details,
         )
 
     @app.exception_handler(HTTPException)

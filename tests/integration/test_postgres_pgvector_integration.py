@@ -28,6 +28,7 @@ from src.modules.catalog.domain.models import (
     SchemeKnowledgeChunk,
     SchemeVersion,
 )
+from src.modules.catalog.infrastructure.repositories import SchemeRepository
 
 PG_TEST_URL = os.getenv(
     "POSTGRES_TEST_URL",
@@ -255,4 +256,195 @@ async def test_postgres_gin_indexing_and_jsonb_queries(pg_engine: AsyncEngine) -
 
         # Clean up
         await session.delete(scheme)
+        await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_postgres_scheme_repository_latest_version_and_gin_containment(
+    pg_engine: AsyncEngine,
+) -> None:
+    """Verify SchemeRepository on PostgreSQL 16 restricts queries to latest version and uses JSONB GIN containment."""
+    session_factory = async_sessionmaker(pg_engine, expire_on_commit=False)
+
+    prefix = uuid.uuid4().hex[:6]
+    sch1_id = f"sch-pg-mv1-{prefix}"
+    sch2_id = f"sch-pg-mv2-{prefix}"
+
+    async with session_factory() as session:
+        repo = SchemeRepository(session)
+
+        # 1. Scheme 1: v1 (CLOSED, GENERAL) -> v2 (OPEN, ST)
+        s1 = Scheme(
+            scheme_id=sch1_id,
+            official_code=f"CODE_{sch1_id}",
+            title_en="Postgres MV 1 (Open ST)",
+            issuing_level=SchemeLevel.STATE_SECTOR,
+            ministry_or_department="Tribal Affairs Manipur",
+            implementing_agency="Govt of Manipur",
+            canonical_source_url="https://example.gov.in/1",
+            guidelines_document_url="https://example.gov.in/1.pdf",
+            is_active=True,
+        )
+        session.add(s1)
+        await session.flush()
+
+        v1_s1 = SchemeVersion(
+            scheme_id=s1.scheme_id,
+            version_number=1,
+            academic_year="2023-2024",
+            content_sha256=f"sha_v1_{prefix}",
+            verification_status=VerificationStatus.OFFICIAL_VERIFIED,
+        )
+        session.add(v1_s1)
+        await session.flush()
+        session.add(
+            SchemeEligibilityRule(
+                version_id=v1_s1.version_id,
+                target_categories=["GENERAL"],
+                eligible_genders=["ANY"],
+                eligible_domiciles=["ALL_INDIA"],
+                eligible_course_levels=["UNDERGRADUATE"],
+                ast_rule_logic={"==": [1, 1]},
+                rule_description_en="Old rule",
+            )
+        )
+        session.add(
+            SchemeApplicationWindow(
+                version_id=v1_s1.version_id,
+                portal_type=PortalType.STATE_DIRECT_PORTAL,
+                portal_url="https://example.gov.in/old",
+                portal_status=PortalWindowStatus.CLOSED,
+            )
+        )
+
+        v2_s1 = SchemeVersion(
+            scheme_id=s1.scheme_id,
+            version_number=2,
+            academic_year="2024-2025",
+            content_sha256=f"sha_v2_{prefix}",
+            verification_status=VerificationStatus.OFFICIAL_VERIFIED,
+        )
+        session.add(v2_s1)
+        await session.flush()
+        session.add(
+            SchemeEligibilityRule(
+                version_id=v2_s1.version_id,
+                target_categories=["ST", "SC"],
+                eligible_genders=["ANY"],
+                eligible_domiciles=["MANIPUR"],
+                eligible_course_levels=["UNDERGRADUATE"],
+                ast_rule_logic={"==": [1, 1]},
+                rule_description_en="New ST rule",
+            )
+        )
+        session.add(
+            SchemeApplicationWindow(
+                version_id=v2_s1.version_id,
+                portal_type=PortalType.STATE_DIRECT_PORTAL,
+                portal_url="https://example.gov.in/new",
+                portal_status=PortalWindowStatus.OPEN,
+            )
+        )
+
+        # 2. Scheme 2: v1 (OPEN, ST) -> v2 (CLOSED, OBC)
+        s2 = Scheme(
+            scheme_id=sch2_id,
+            official_code=f"CODE_{sch2_id}",
+            title_en="Postgres MV 2 (Closed OBC)",
+            issuing_level=SchemeLevel.STATE_SECTOR,
+            ministry_or_department="OBC Directorate Manipur",
+            implementing_agency="Govt of Manipur",
+            canonical_source_url="https://example.gov.in/2",
+            guidelines_document_url="https://example.gov.in/2.pdf",
+            is_active=True,
+        )
+        session.add(s2)
+        await session.flush()
+
+        v1_s2 = SchemeVersion(
+            scheme_id=s2.scheme_id,
+            version_number=1,
+            academic_year="2023-2024",
+            content_sha256=f"sha_v1_s2_{prefix}",
+            verification_status=VerificationStatus.OFFICIAL_VERIFIED,
+        )
+        session.add(v1_s2)
+        await session.flush()
+        session.add(
+            SchemeEligibilityRule(
+                version_id=v1_s2.version_id,
+                target_categories=["ST"],
+                eligible_genders=["ANY"],
+                eligible_domiciles=["MANIPUR"],
+                eligible_course_levels=["UNDERGRADUATE"],
+                ast_rule_logic={"==": [1, 1]},
+                rule_description_en="Old ST rule",
+            )
+        )
+        session.add(
+            SchemeApplicationWindow(
+                version_id=v1_s2.version_id,
+                portal_type=PortalType.STATE_DIRECT_PORTAL,
+                portal_url="https://example.gov.in/old2",
+                portal_status=PortalWindowStatus.OPEN,
+            )
+        )
+
+        v2_s2 = SchemeVersion(
+            scheme_id=s2.scheme_id,
+            version_number=2,
+            academic_year="2024-2025",
+            content_sha256=f"sha_v2_s2_{prefix}",
+            verification_status=VerificationStatus.OFFICIAL_VERIFIED,
+        )
+        session.add(v2_s2)
+        await session.flush()
+        session.add(
+            SchemeEligibilityRule(
+                version_id=v2_s2.version_id,
+                target_categories=["OBC"],
+                eligible_genders=["ANY"],
+                eligible_domiciles=["MANIPUR"],
+                eligible_course_levels=["UNDERGRADUATE"],
+                ast_rule_logic={"==": [1, 1]},
+                rule_description_en="New OBC rule",
+            )
+        )
+        session.add(
+            SchemeApplicationWindow(
+                version_id=v2_s2.version_id,
+                portal_type=PortalType.STATE_DIRECT_PORTAL,
+                portal_url="https://example.gov.in/new2",
+                portal_status=PortalWindowStatus.CLOSED,
+            )
+        )
+        await session.commit()
+
+        # Test A: Filter portal_status=OPEN
+        open_items, _ = await repo.list_schemes(portal_status=PortalWindowStatus.OPEN)
+        open_ids = [it.scheme_id for it in open_items]
+        assert sch1_id in open_ids
+        assert sch2_id not in open_ids  # v1 was open, but current v2 is closed!
+
+        # Test B: Filter portal_status=CLOSED
+        closed_items, _ = await repo.list_schemes(portal_status=PortalWindowStatus.CLOSED)
+        closed_ids = [it.scheme_id for it in closed_items]
+        assert sch2_id in closed_ids
+        assert sch1_id not in closed_ids
+
+        # Test C: Filter category=ST (uses PostgreSQL JSONB containment @>)
+        st_items, _ = await repo.list_schemes(category="ST")
+        st_ids = [it.scheme_id for it in st_items]
+        assert sch1_id in st_ids
+        assert sch2_id not in st_ids  # v1 had ST, but current v2 is OBC!
+
+        # Test D: Filter category=OBC (uses PostgreSQL JSONB containment @>)
+        obc_items, _ = await repo.list_schemes(category="OBC")
+        obc_ids = [it.scheme_id for it in obc_items]
+        assert sch2_id in obc_ids
+        assert sch1_id not in obc_ids
+
+        # Clean up
+        await session.delete(s1)
+        await session.delete(s2)
         await session.commit()

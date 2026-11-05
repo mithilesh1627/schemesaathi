@@ -33,10 +33,16 @@ class Settings(BaseSettings):
         description="Async SQLAlchemy database connection URI",
     )
     DB_POOL_SIZE: int = Field(
-        default=20, ge=1, le=100, description="Base persistent connection pool size"
+        default=10,
+        ge=1,
+        le=100,
+        description="Base persistent connection pool size per worker (2 workers * 10 = 20)",
     )
     DB_MAX_OVERFLOW: int = Field(
-        default=10, ge=0, le=50, description="Max burst connections beyond pool size"
+        default=5,
+        ge=0,
+        le=50,
+        description="Max burst connections beyond pool size per worker (2 workers * 5 = 10, total max 30)",
     )
     DB_POOL_TIMEOUT: float = Field(
         default=30.0, ge=1.0, description="Seconds to wait before raising pool timeout"
@@ -78,7 +84,11 @@ class Settings(BaseSettings):
 
     # Rate Limiting & Security
     RATE_LIMIT_PER_MINUTE: int = 60
-    CORS_ORIGINS: list[str] = ["*"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+    CORS_ALLOW_CREDENTIALS: bool = True
     SECRET_KEY: str = Field(
         default="insecure-development-secret-key-change-in-production-env",
         description="Cryptographic secret key for signing tokens",
@@ -95,7 +105,7 @@ class Settings(BaseSettings):
             return [i.strip() for i in v.split(",") if i.strip()]
         if isinstance(v, list):
             return v
-        return ["*"]
+        return ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
@@ -114,6 +124,10 @@ class Settings(BaseSettings):
             if not self.ADMIN_API_KEY or len(self.ADMIN_API_KEY) < 16:
                 raise ValueError(
                     "ADMIN_API_KEY must be configured and >= 16 characters in production environment."
+                )
+            if self.CORS_ALLOW_CREDENTIALS and ("*" in self.CORS_ORIGINS):
+                raise ValueError(
+                    "CORS_ORIGINS cannot contain wildcard '*' when CORS_ALLOW_CREDENTIALS is True in production."
                 )
             if "sqlite" in self.DATABASE_URL.lower():
                 raise ValueError("SQLite is strictly forbidden in production environment.")
