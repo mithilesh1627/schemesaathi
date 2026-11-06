@@ -32,6 +32,19 @@ Thumbs.db
 Desktop.ini
 
 # Local data & storage
-data/
-documents/
+data/*
+!data/storage/
+data/storage/*
+!data/storage/documents/
+data/storage/documents/*
+!data/storage/documents/*/
+data/storage/documents/*/*
+!data/storage/documents/c9/c96f3a6591bb776ab2f5ee9d52fe9a63e5bb762fd9b660c05df7f2bd568a370e.pdf
+!data/storage/documents/33/3301d7d84202ff75d139549b766723418c02817c3ad51ba8f55cdb6dacb3a121.pdf
+!data/storage/documents/62/62be4986d375084dc770e217b475b46bf5dfd35e9a0a66c32279f97ef1661261.pdf
+!data/storage/documents/f5/f51443a126e0b8d5af6894a8550fa476253047cb19b9c7b60c89b8be71ea2c5c.pdf
+!data/storage/documents/43/436d04efeab9db6e22c65f7cc1c816c1c4b2f664589dddf2dc7e8eed38afa64c.pdf
+!data/storage/documents/fc/fc2afadccbb34fbda54663da2681dab2303569d28810c8761dfed71313fe265f.pdf
+!data/storage/documents/fc/fc413fe8c107ad0bc0f1f769f46a4dbf92c9e743d6a5e9997ae632a2ee975973.pdf
+/documents/
 
