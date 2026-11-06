@@ -28,9 +28,7 @@ def upgrade() -> None:
         op.execute("TRUNCATE TABLE scheme_knowledge_chunks CASCADE")
 
         # 3. Alter column type to vector(1024) for BAAI/bge-m3
-        op.execute(
-            "ALTER TABLE scheme_knowledge_chunks ALTER COLUMN embedding TYPE vector(1024)"
-        )
+        op.execute("ALTER TABLE scheme_knowledge_chunks ALTER COLUMN embedding TYPE vector(1024)")
 
         # 4. Rebuild HNSW index with vector_cosine_ops for 1024 dimensions
         op.execute(
@@ -55,9 +53,7 @@ def downgrade() -> None:
     if dialect_name == "postgresql":
         op.execute("DROP INDEX IF EXISTS idx_knowledge_chunks_embedding")
         op.execute("TRUNCATE TABLE scheme_knowledge_chunks CASCADE")
-        op.execute(
-            "ALTER TABLE scheme_knowledge_chunks ALTER COLUMN embedding TYPE vector(1536)"
-        )
+        op.execute("ALTER TABLE scheme_knowledge_chunks ALTER COLUMN embedding TYPE vector(1536)")
         op.execute(
             "CREATE INDEX idx_knowledge_chunks_embedding ON scheme_knowledge_chunks "
             "USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)"
