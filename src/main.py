@@ -18,6 +18,8 @@ from src.core.redis import close_redis
 from src.modules.catalog.infrastructure.seed_data import seed_pilot_schemes
 from src.modules.catalog.router import router as catalog_router
 from src.modules.eligibility.router import router as eligibility_router
+from src.modules.retrieval.application.corpus_seed_service import CorpusSeedService
+from src.modules.retrieval.router import router as retrieval_router
 
 logger = get_logger(__name__)
 
@@ -42,6 +44,8 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
                 session_factory = get_session_factory()
                 async with session_factory() as session:
                     await seed_pilot_schemes(session)
+                    seed_service = CorpusSeedService(session)
+                    await seed_service.seed_guideline_corpus()
             except Exception as seed_err:
                 logger.warning("Auto-seed on startup skipped: %s", seed_err)
     except Exception as exc:
@@ -91,6 +95,7 @@ def create_app() -> FastAPI:
     # 4. Register Bounded Context Routers
     app.include_router(catalog_router, prefix=settings.API_V1_PREFIX)
     app.include_router(eligibility_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(retrieval_router, prefix=settings.API_V1_PREFIX)
 
     # 5. Register Thin Demo Webpage
     @app.get(
