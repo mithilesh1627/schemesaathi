@@ -30,17 +30,13 @@ from src.modules.catalog.domain.models import (
 )
 from src.modules.catalog.infrastructure.repositories import SchemeRepository
 
-PG_TEST_URL = os.getenv(
-    "POSTGRES_TEST_URL",
-    os.getenv(
-        "DATABASE_URL",
-        "postgresql+asyncpg://schemesaathi:schemesaathi_dev_password@localhost:5432/schemesaathi_db",
-    ),
-)
+PG_TEST_URL = os.getenv("POSTGRES_TEST_URL") or os.getenv("DATABASE_URL") or ""
 
 
 def check_postgres_availability() -> bool:
     """Check if PostgreSQL 16 instance is reachable. In CI, failure to connect fails the test suite."""
+    if not PG_TEST_URL:
+        return False
     host = "localhost"
     port = 5432
     try:
@@ -82,7 +78,10 @@ skip_if_no_pg = pytest.mark.skipif(
 
 
 @pytest.fixture
-def pg_engine() -> Iterator[AsyncEngine]:
+def pg_engine() -> Iterator[AsyncEngine | None]:
+    if not PG_TEST_URL:
+        yield None
+        return
     engine = create_async_engine(PG_TEST_URL, echo=False)
     yield engine
 
@@ -260,6 +259,7 @@ async def test_postgres_gin_indexing_and_jsonb_queries(pg_engine: AsyncEngine) -
 
 
 @pytest.mark.asyncio
+@skip_if_no_pg
 async def test_postgres_scheme_repository_latest_version_and_gin_containment(
     pg_engine: AsyncEngine,
 ) -> None:

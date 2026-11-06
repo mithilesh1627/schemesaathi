@@ -18,6 +18,7 @@ from src.modules.catalog.domain.models import (
 )
 from src.modules.retrieval.application.embedding_service import local_embedder
 from src.modules.retrieval.domain.chunker import HierarchicalChunker
+from src.modules.retrieval.domain.models import DocumentExtractionResult
 from src.modules.retrieval.infrastructure.extractors import (
     DigitalPdfExtractor,
     HtmlExtractor,
@@ -55,7 +56,9 @@ KNOWN_STATUTORY_HEADINGS: list[str] = [
 ]
 
 
-def parse_extracted_text_to_sections(raw_text: str, scheme_title: str) -> list[dict[str, Any]]:
+def parse_extracted_text_to_sections(
+    raw_text: str, scheme_title: str, tables: list[dict[str, Any]] | None = None
+) -> list[dict[str, Any]]:
     """Parse raw extracted document text into structured sections and markdown tables."""
     lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
     sections: list[dict[str, Any]] = []
@@ -93,75 +96,22 @@ def parse_extracted_text_to_sections(raw_text: str, scheme_title: str) -> list[d
     if current_lines:
         sections.append({"section_title": current_title, "content": "\n".join(current_lines)})
 
-    # Structure detected allowance tables into Markdown format
-    parsed_sections: list[dict[str, Any]] = []
-    for sec in sections:
-        title = sec["section_title"]
-        content = sec["content"]
-        if any(keyword in title for keyword in ("Slabs", "Rates", "Table")):
-            sec_lines = [line_str for line_str in content.split("\n") if line_str.strip()]
-            if any("Group" in line_str for line_str in sec_lines) or any(
-                "Allowance" in line_str for line_str in sec_lines
-            ):
-                table_md = _format_markdown_table_for_heading(title)
-                if table_md:
-                    parsed_sections.append(
-                        {
-                            "section_title": title,
-                            "is_table": True,
-                            "table_markdown": table_md,
-                            "content": content,
-                        }
-                    )
-                    continue
-        parsed_sections.append(sec)
+    # Append any tables authentically extracted from the real PDF document
+    if tables:
+        for t in tables:
+            sections.append(
+                {
+                    "section_title": t.get("table_name", "Maintenance Allowance Slabs"),
+                    "is_table": True,
+                    "table_markdown": t["table_markdown"],
+                    "content": t["table_markdown"],
+                }
+            )
 
-    return parsed_sections
+    return sections
 
 
-def _format_markdown_table_for_heading(heading: str) -> str | None:
-    """Format official statutory maintenance allowance rates as atomic Markdown tables."""
-    if "PM-YASASVI" in heading:
-        # MoSJE PM-YASASVI Guidelines Section 5 Table 1: Group 1 Day Scholar is ₹10,000 / Hosteller ₹20,000
-        return (
-            "| Group | Course Classification | Hosteller Allowance (₹/Year) | Day Scholar Allowance (₹/Year) |\n"
-            "| --- | --- | --- | --- |\n"
-            "| Group 1 | Degree & PG Professional Courses (MBBS, B.Tech, M.Tech, MBA, MCA) | ₹20,000 | ₹10,000 |\n"
-            "| Group 2 | Professional Diplomas, Paramedical, Nursing | ₹13,000 | ₹8,000 |\n"
-            "| Group 3 | General Degree & PG (BA, BSc, BCom, MA, MSc) | ₹8,000 | ₹6,000 |\n"
-            "| Group 4 | Higher Secondary (Classes 11 & 12), ITI Certificate Courses | ₹5,000 | ₹4,000 |"
-        )
-    if (
-        "Post-Matric ST" in heading
-        or "ST Maintenance" in heading
-        or "Maintenance Allowance Slabs" in heading
-    ):
-        return (
-            "| Group | Eligible Course Classification | Hosteller Rate (₹/Year) | Day Scholar Rate (₹/Year) |\n"
-            "| --- | --- | --- | --- |\n"
-            "| Group 1 | Degree and PG Degree in Medicine, Engineering, Agriculture, Veterinary, Technology | ₹13,500 | ₹7,000 |\n"
-            "| Group 2 | Professional Courses, Pharmacy, Nursing, LLB, Management, Paramedical Diplomas | ₹9,500 | ₹6,500 |\n"
-            "| Group 3 | General Undergraduate and Postgraduate Degrees (BA, BSc, BCom, MA, MSc, MCom) | ₹7,000 | ₹4,000 |\n"
-            "| Group 4 | Class 11, Class 12, Intermediate, ITI, Polytechnic Vocational Courses | ₹4,000 | ₹2,500 |"
-        )
-    if "SC Maintenance" in heading:
-        return (
-            "| Group | Course Category | Hosteller Rate (₹/Year) | Day Scholar Rate (₹/Year) |\n"
-            "| --- | --- | --- | --- |\n"
-            "| Group 1 | Degree & PG Degree in Medicine, Engineering, Technology, Management | ₹13,500 | ₹7,000 |\n"
-            "| Group 2 | Professional Diplomas, Pharmacy, Nursing, LLB | ₹9,500 | ₹6,500 |\n"
-            "| Group 3 | General College UG/PG Degrees (BA, BSc, BCom, MA, MSc) | ₹7,000 | ₹4,000 |\n"
-            "| Group 4 | Higher Secondary Class 11, Class 12, ITI Courses | ₹4,000 | ₹2,500 |"
-        )
-    if "Pre-Matric Rates" in heading:
-        return (
-            "| Component Description | Hosteller Allowance (₹/Year) | Day Scholar Allowance (₹/Year) |\n"
-            "| --- | --- | --- |\n"
-            "| Maintenance Allowance | ₹7,000 | ₹3,500 |\n"
-            "| Book and Equipment Grant | ₹1,000 | ₹1,000 |\n"
-            "| Total Annual Assistance | ₹8,000 | ₹4,500 |"
-        )
-    return None
+_EXTRACTION_CACHE: dict[str, DocumentExtractionResult] = {}
 
 
 class CorpusSeedService:
@@ -207,28 +157,8 @@ class CorpusSeedService:
                 doc_bytes: bytes | None = None
                 source_url = sch.guidelines_document_url or sch.canonical_source_url
 
-                # Step 1: Attempt remote statutory fetch if URL is provided
-                if source_url and source_url.startswith("http"):
-                    try:
-                        resp = await client.get(source_url)
-                        if resp.status_code == 200 and len(resp.content) > 100:
-                            doc_bytes = resp.content
-                            logger.info(
-                                "Successfully fetched official guideline for %s from %s (%d bytes).",
-                                sch.scheme_id,
-                                source_url,
-                                len(doc_bytes),
-                            )
-                    except Exception as exc:
-                        logger.warning(
-                            "Remote portal fetch for %s (%s) failed: %s. Falling back to local storage.",
-                            sch.scheme_id,
-                            source_url,
-                            exc,
-                        )
-
-                # Step 2: Fallback to stored document if remote fetch failed or offline
-                if doc_bytes is None and ver.storage_path:
+                # Step 1: Check verified storage first for deterministic local availability
+                if ver.storage_path:
                     try:
                         if await self.storage.exists(ver.storage_path):
                             doc_bytes = await self.storage.retrieve(ver.storage_path)
@@ -253,6 +183,28 @@ class CorpusSeedService:
                             exc,
                         )
 
+                # Step 2: Attempt remote statutory fetch if not found in local storage
+                if doc_bytes is None and source_url and source_url.startswith("http"):
+                    try:
+                        resp = await client.get(source_url)
+                        if resp.status_code == 200 and len(resp.content) > 100:
+                            doc_bytes = resp.content
+                            logger.info(
+                                "Successfully fetched official guideline for %s from %s (%d bytes).",
+                                sch.scheme_id,
+                                source_url,
+                                len(doc_bytes),
+                            )
+                            if ver.storage_path:
+                                await self.storage.store(ver.storage_path, doc_bytes)
+                    except Exception as exc:
+                        logger.warning(
+                            "Remote portal fetch for %s (%s) failed: %s.",
+                            sch.scheme_id,
+                            source_url,
+                            exc,
+                        )
+
                 # Step 3: If document could not be retrieved, report as missing and skip honestly
                 if doc_bytes is None:
                     missing_guidelines.append(sch.scheme_id)
@@ -264,31 +216,39 @@ class CorpusSeedService:
 
                 # Step 4: Extract text via appropriate extractor
                 doc_sha256 = hashlib.sha256(doc_bytes).hexdigest()
-                is_pdf = doc_bytes.startswith(b"%PDF")
-                is_html = b"<html" in doc_bytes.lower() or b"<!doctype html" in doc_bytes.lower()
+                if doc_sha256 in _EXTRACTION_CACHE:
+                    doc_result = _EXTRACTION_CACHE[doc_sha256]
+                else:
+                    is_pdf = doc_bytes.startswith(b"%PDF")
+                    is_html = (
+                        b"<html" in doc_bytes.lower() or b"<!doctype html" in doc_bytes.lower()
+                    )
 
-                if is_html:
-                    html_text = doc_bytes.decode("utf-8", errors="ignore")
-                    doc_result = HtmlExtractor.extract(
-                        html_text, f"{sch.scheme_id}.html", source_url
-                    )
-                elif is_pdf:
-                    # Run digital PDF extraction first
-                    doc_result = DigitalPdfExtractor.extract(
-                        doc_bytes, f"{sch.scheme_id}.pdf", source_url
-                    )
-                    # If digital text extraction yields negligible characters, run OCR
-                    if doc_result.character_count < 100 and self.ocr_extractor.is_available():
-                        logger.info(
-                            "Digital text empty for %s. Running PaddleOCR scanned extraction.",
-                            sch.scheme_id,
+                    if is_html:
+                        html_text = doc_bytes.decode("utf-8", errors="ignore")
+                        doc_result = HtmlExtractor.extract(
+                            html_text, f"{sch.scheme_id}.html", source_url
                         )
-                        doc_result = self.ocr_extractor.extract(
+                    elif is_pdf:
+                        # Run digital PDF extraction first
+                        doc_result = DigitalPdfExtractor.extract(
                             doc_bytes, f"{sch.scheme_id}.pdf", source_url
                         )
-                else:
-                    logger.warning("Unrecognized document format for %s. Skipping.", sch.scheme_id)
-                    continue
+                        # If digital text extraction yields negligible characters, run OCR
+                        if doc_result.character_count < 100 and self.ocr_extractor.is_available():
+                            logger.info(
+                                "Digital text empty for %s. Running PaddleOCR scanned extraction.",
+                                sch.scheme_id,
+                            )
+                            doc_result = self.ocr_extractor.extract(
+                                doc_bytes, f"{sch.scheme_id}.pdf", source_url
+                            )
+                    else:
+                        logger.warning(
+                            "Unrecognized document format for %s. Skipping.", sch.scheme_id
+                        )
+                        continue
+                    _EXTRACTION_CACHE[doc_sha256] = doc_result
 
                 # Advance lifecycle state
                 ver.lifecycle_state = DocumentLifecycleState.EXTRACTED.value
@@ -314,7 +274,9 @@ class CorpusSeedService:
                 )
 
                 # Step 6: Parse extracted text into domain sections and atomic Markdown tables
-                sections = parse_extracted_text_to_sections(doc_result.raw_text, sch.title_en)
+                sections = parse_extracted_text_to_sections(
+                    doc_result.raw_text, sch.title_en, tables=doc_result.tables
+                )
 
                 # Step 7: Chunk document sections using Hierarchical Table-Preserving Chunker
                 chunks = self.chunker.chunk_document_sections(

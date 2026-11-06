@@ -11,11 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.logging import get_logger
 from src.core.storage import get_storage_backend
 from src.modules.catalog.domain.models import SchemeVersion
+from src.modules.retrieval.application.corpus_seed_service import _EXTRACTION_CACHE
 from src.modules.retrieval.application.embedding_service import local_embedder
 from src.modules.retrieval.domain.acronyms import expand_query_acronyms
 from src.modules.retrieval.domain.models import RetrievalCandidate
 from src.modules.retrieval.domain.script_router import ScriptRouter
-from src.modules.retrieval.infrastructure.extractors import DigitalPdfExtractor
+from src.modules.retrieval.infrastructure.extractors import (
+    DigitalPdfExtractor,
+    ScannedPdfOcrExtractor,
+)
 from src.modules.retrieval.infrastructure.repositories import RetrievalRepository
 
 logger = get_logger(__name__)
@@ -46,7 +50,11 @@ async def compute_invented_chunk_count(
                 select(SchemeVersion).where(SchemeVersion.version_id == v_id)
             )
             v = v_res.scalars().first()
-            if not v or not v.storage_path:
+            if not v:
+                doc_text_cache[v_id] = ""
+            elif v.content_sha256 and v.content_sha256 in _EXTRACTION_CACHE:
+                doc_text_cache[v_id] = _EXTRACTION_CACHE[v.content_sha256].raw_text.lower()
+            elif not v.storage_path:
                 doc_text_cache[v_id] = ""
             else:
                 try:
@@ -59,6 +67,12 @@ async def compute_invented_chunk_count(
                         doc_res = DigitalPdfExtractor.extract(
                             pdf_bytes, "doc.pdf", candidate.source_url
                         )
+                        if doc_res.character_count < 100:
+                            ocr_ext = ScannedPdfOcrExtractor()
+                            if ocr_ext.is_available():
+                                doc_res = ocr_ext.extract(
+                                    pdf_bytes, "doc.pdf", candidate.source_url
+                                )
                         doc_text_cache[v_id] = doc_res.raw_text.lower()
                     else:
                         doc_text_cache[v_id] = ""
@@ -149,7 +163,7 @@ class RetrievalService:
             chunk_map[ch.chunk_id] = ch
         for ch, sim in dense_matches:
             # Only consider dense match if it meets relevance threshold or has sparse support
-            if sim >= 0.48 or ch.chunk_id in chunk_map:
+            if sim >= 0.52 or ch.chunk_id in chunk_map:
                 chunk_map[ch.chunk_id] = ch
 
         if not chunk_map:
@@ -172,7 +186,7 @@ class RetrievalService:
             d_score = dense_scores.get(cid, 0.0)
 
             # Strict relevance gate: reject if zero sparse match and weak dense similarity
-            if s_rank is None and d_score < 0.48:
+            if s_rank is None and d_score < 0.52:
                 continue
 
             rrf_score = 0.0

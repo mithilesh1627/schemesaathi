@@ -39,12 +39,15 @@ data/storage/*
 data/storage/documents/*
 !data/storage/documents/*/
 data/storage/documents/*/*
-!data/storage/documents/c9/c96f3a6591bb776ab2f5ee9d52fe9a63e5bb762fd9b660c05df7f2bd568a370e.pdf
-!data/storage/documents/33/3301d7d84202ff75d139549b766723418c02817c3ad51ba8f55cdb6dacb3a121.pdf
-!data/storage/documents/62/62be4986d375084dc770e217b475b46bf5dfd35e9a0a66c32279f97ef1661261.pdf
-!data/storage/documents/f5/f51443a126e0b8d5af6894a8550fa476253047cb19b9c7b60c89b8be71ea2c5c.pdf
-!data/storage/documents/43/436d04efeab9db6e22c65f7cc1c816c1c4b2f664589dddf2dc7e8eed38afa64c.pdf
-!data/storage/documents/fc/fc2afadccbb34fbda54663da2681dab2303569d28810c8761dfed71313fe265f.pdf
-!data/storage/documents/fc/fc413fe8c107ad0bc0f1f769f46a4dbf92c9e743d6a5e9997ae632a2ee975973.pdf
+!data/storage/documents/95/9596807e57debb7b141d18815054363e130a4e7cd454f5bea58598a6ce7ae22c.pdf
+!data/storage/documents/8d/8d1949278ec951864b7f21fbc171f8afa99fdb4dcb2bc767e3b18a81d3ae7ff8.pdf
+!data/storage/documents/eb/eb53bc37acc93eccbe811f648e7e741ea05b607db796dc1b759cc8e987256efe.pdf
+!data/storage/documents/8e/8e35745e3319bfe532502d9c28e49d6ce704ec1a95a87bd7e983631b1a99474b.pdf
+!data/storage/documents/3e/3e7cea65397d06b42644681257beea11193aff243a5aa398818f6f2c2dbfdaf5.pdf
+!data/storage/documents/cf/cf73697baff4d7ebaf5919363296479b501ea9efc146a27de50623a9472cfa57.pdf
+data/storage/ocr_cache/*
+!data/storage/ocr_cache/
+!data/storage/ocr_cache/8d1949278ec951864b7f21fbc171f8afa99fdb4dcb2bc767e3b18a81d3ae7ff8.txt
+!data/storage/ocr_cache/cf73697baff4d7ebaf5919363296479b501ea9efc146a27de50623a9472cfa57.txt
 /documents/
 

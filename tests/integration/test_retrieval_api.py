@@ -87,9 +87,10 @@ async def test_golden_table_query_intact_preservation(async_client: AsyncClient)
         if r["scheme_id"] == "SCH-MN-005" and "Maintenance Allowance Slabs" in r["section_title"]
     )
     assert "| Group |" in target_chunk["chunk_content"]
-    assert "Group 1" in target_chunk["chunk_content"]
-    assert "Group 4" in target_chunk["chunk_content"]
-    assert "13,500" in target_chunk["chunk_content"]
+    assert "Group-I" in target_chunk["chunk_content"]
+    assert "Group-IV" in target_chunk["chunk_content"]
+    assert "1200" in target_chunk["chunk_content"]
+    assert "550" in target_chunk["chunk_content"]
 
 
 @pytest.mark.asyncio

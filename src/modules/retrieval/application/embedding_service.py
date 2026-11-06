@@ -25,6 +25,7 @@ class BgeM3Embedder:
         self.dimension = dimension
         self.model_version = MODEL_VERSION
         self._model: Any = None
+        self._cache: dict[str, list[float]] = {}
 
     def _get_model(self) -> Any:
         """Lazy load SentenceTransformer model on first inference."""
@@ -47,6 +48,9 @@ class BgeM3Embedder:
             vec[0] = 1.0
             return vec
 
+        if clean_text in self._cache:
+            return self._cache[clean_text]
+
         model = self._get_model()
         # encode with normalize_embeddings=True produces unit L2 vectors
         embedding_arr = model.encode(clean_text, normalize_embeddings=True)
@@ -59,6 +63,7 @@ class BgeM3Embedder:
                 f"expected {self.dimension} dimensions"
             )
 
+        self._cache[clean_text] = vec
         return vec
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:

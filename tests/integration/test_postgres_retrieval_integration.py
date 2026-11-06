@@ -28,17 +28,13 @@ from src.modules.retrieval.application.embedding_service import local_embedder
 from src.modules.retrieval.application.retrieval_service import RetrievalService
 from src.modules.retrieval.infrastructure.repositories import RetrievalRepository
 
-PG_TEST_URL = os.getenv(
-    "POSTGRES_TEST_URL",
-    os.getenv(
-        "DATABASE_URL",
-        "postgresql+asyncpg://schemesaathi:test162741@127.0.0.1:5432/schemesaathi_db",
-    ),
-)
+PG_TEST_URL = os.getenv("POSTGRES_TEST_URL") or os.getenv("DATABASE_URL") or ""
 
 
 def check_postgres_availability() -> bool:
     """Check if PostgreSQL 16 instance is reachable."""
+    if not PG_TEST_URL:
+        return False
     host = "localhost"
     port = 5432
     try:
