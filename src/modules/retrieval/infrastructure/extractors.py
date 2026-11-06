@@ -200,7 +200,12 @@ class ScannedPdfOcrExtractor:
             return False
 
     def extract(
-        self, pdf_bytes: bytes, source_name: str, source_url: str, max_pages: int = 4
+        self,
+        pdf_bytes: bytes,
+        source_name: str,
+        source_url: str,
+        max_pages: int | None = None,
+        use_cache: bool = True,
     ) -> DocumentExtractionResult:
         """Run OCR over scanned PDF pages using pypdfium2 rendering and PaddleOCR."""
         try:
@@ -212,7 +217,7 @@ class ScannedPdfOcrExtractor:
         doc_hash = hashlib.sha256(pdf_bytes).hexdigest()
         cache_dir = Path("data/storage/ocr_cache")
         cache_file = cache_dir / f"{doc_hash}.txt"
-        if cache_file.exists():
+        if use_cache and cache_file.exists():
             full_text = cache_file.read_text(encoding="utf-8")
             char_count = len(full_text)
             detected_tables = extract_tables_from_digital_text(full_text)
@@ -230,7 +235,7 @@ class ScannedPdfOcrExtractor:
         extracted_pages: list[str] = []
         ocr_engine = self._get_ocr()
 
-        pages_to_process = min(page_count, max_pages) if max_pages else page_count
+        pages_to_process = min(page_count, max_pages) if max_pages is not None else page_count
         for page_idx in range(pages_to_process):
             try:
                 page = pdf[page_idx]
@@ -262,11 +267,12 @@ class ScannedPdfOcrExtractor:
                 )
 
         full_text = "\n\n".join(extracted_pages)
-        try:
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            cache_file.write_text(full_text, encoding="utf-8")
-        except Exception:
-            pass
+        if use_cache and (max_pages is None or max_pages >= page_count):
+            try:
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                cache_file.write_text(full_text, encoding="utf-8")
+            except Exception:
+                pass
         char_count = len(full_text)
         detected_tables = extract_tables_from_digital_text(full_text)
 

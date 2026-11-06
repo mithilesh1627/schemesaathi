@@ -164,7 +164,7 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
         "ministry_or_department": "Directorate for Welfare of OBC & SC, Government of Manipur",
         "implementing_agency": "Directorate for Welfare of OBC & SC / MoSJE",
         "canonical_source_url": "https://manipurobcsc.mn.gov.in",
-        "guidelines_document_url": "https://scholarships.gov.in/public/schemeGuidelines/HP_state_scheme/Centrally%20Sponsored%20Scheme%20of%20Post%20Matric%20Scholarship%20Scheme%20for%20OBC_scheme.pdf",
+        "guidelines_document_url": "https://scholarships.gov.in/public/schemeGuidelines/Centrally%20Sponsored%20Scheme%20of%20Post%20Matric%20Scholarship%20Scheme%20for%20OBC_scheme.pdf",
         "version": {
             "version_number": 1,
             "academic_year": "2024-2025",
@@ -351,7 +351,7 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
         "ministry_or_department": "Directorate of University & Higher Education, Government of Manipur",
         "implementing_agency": "Higher Education Department Manipur",
         "canonical_source_url": "https://highereducationmanipur.gov.in",
-        "guidelines_document_url": "https://www.govtschemes.in/sites/default/files/2026-10/Guidelines%20of%20Manipur%20chief%20minister%27s%20college%20students%20rehabilitation%20scheme.pdf?v=1",
+        "guidelines_document_url": "https://highereducationmanipur.gov.in/chief-ministers-college-students-rehabilitation-scheme-cmcsrs-2023/",
         "version": {
             "version_number": 1,
             "academic_year": "2024-2025",
