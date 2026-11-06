@@ -133,7 +133,7 @@ async def test_postgres_extensions_and_vector_operations(pg_engine: AsyncEngine)
         session.add(version)
         await session.flush()
 
-        # 3. Insert Knowledge Chunks with 1536-dim embeddings and metadata
+        # 3. Insert Knowledge Chunks with 1024-dim embeddings and metadata
         chunk1 = SchemeKnowledgeChunk(
             version_id=version.version_id,
             scheme_id=scheme.scheme_id,
@@ -141,9 +141,9 @@ async def test_postgres_extensions_and_vector_operations(pg_engine: AsyncEngine)
             section_title="Income Ceiling Rule",
             chunk_content="Family income must not exceed 2.50 lakh per annum for ST students.",
             token_count=14,
-            embedding=[0.01] * 1536,
-            embedding_model="text-embedding-3-small",
-            embedding_dimension=1536,
+            embedding=[0.01] * 1024,
+            embedding_model="BAAI/bge-m3",
+            embedding_dimension=1024,
             model_version="v1",
             content_sha256="1" * 64,
         )
@@ -154,9 +154,9 @@ async def test_postgres_extensions_and_vector_operations(pg_engine: AsyncEngine)
             section_title="Day Scholar Allowance",
             chunk_content="Day scholar maintenance allowance is rupees 7000 annually.",
             token_count=10,
-            embedding=[0.85] * 1536,
-            embedding_model="text-embedding-3-small",
-            embedding_dimension=1536,
+            embedding=[0.85] * 1024,
+            embedding_model="BAAI/bge-m3",
+            embedding_dimension=1024,
             model_version="v1",
             content_sha256="2" * 64,
         )
@@ -164,7 +164,7 @@ async def test_postgres_extensions_and_vector_operations(pg_engine: AsyncEngine)
         await session.commit()
 
         # 4. Perform cosine distance search
-        query_vector = [0.01] * 1536
+        query_vector = [0.01] * 1024
         stmt = (
             select(SchemeKnowledgeChunk)
             .where(SchemeKnowledgeChunk.scheme_id == test_id)
@@ -175,8 +175,8 @@ async def test_postgres_extensions_and_vector_operations(pg_engine: AsyncEngine)
         closest_chunk = result.scalar_one()
 
         assert closest_chunk.section_title == "Income Ceiling Rule"
-        assert closest_chunk.embedding_model == "text-embedding-3-small"
-        assert closest_chunk.embedding_dimension == 1536
+        assert closest_chunk.embedding_model == "BAAI/bge-m3"
+        assert closest_chunk.embedding_dimension == 1024
         assert closest_chunk.model_version == "v1"
 
         # 5. Clean up via CASCADE delete on parent scheme

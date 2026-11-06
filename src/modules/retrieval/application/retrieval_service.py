@@ -1,18 +1,92 @@
 """Hybrid Retrieval Service combining Sparse BM25/tsvector and Dense pgvector HNSW via RRF."""
 
+import re
+import uuid
+from pathlib import Path
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.logging import get_logger
+from src.core.storage import get_storage_backend
+from src.modules.catalog.domain.models import SchemeVersion
 from src.modules.retrieval.application.embedding_service import local_embedder
 from src.modules.retrieval.domain.acronyms import expand_query_acronyms
+from src.modules.retrieval.domain.models import RetrievalCandidate
 from src.modules.retrieval.domain.script_router import ScriptRouter
+from src.modules.retrieval.infrastructure.extractors import DigitalPdfExtractor
 from src.modules.retrieval.infrastructure.repositories import RetrievalRepository
 
 logger = get_logger(__name__)
 
 RRF_K = 60  # Reciprocal Rank Fusion smoothing constant as specified in M0 architecture
+STATUTORY_DISCLAIMER = (
+    "Search results reflect retrieved statutory guidelines only. "
+    "Application windows for academic year 2024-2025 are closed."
+)
+
+
+async def compute_invented_chunk_count(
+    session: AsyncSession,
+    candidates: list[RetrievalCandidate],
+) -> int:
+    """Dynamically verify candidate chunks against extracted text of statutory source documents."""
+    if not candidates:
+        return 0
+
+    storage = get_storage_backend()
+    doc_text_cache: dict[uuid.UUID, str] = {}
+    invented_count = 0
+
+    for candidate in candidates:
+        v_id = candidate.version_id
+        if v_id not in doc_text_cache:
+            v_res = await session.execute(
+                select(SchemeVersion).where(SchemeVersion.version_id == v_id)
+            )
+            v = v_res.scalars().first()
+            if not v or not v.storage_path:
+                doc_text_cache[v_id] = ""
+            else:
+                try:
+                    if await storage.exists(v.storage_path):
+                        pdf_bytes = await storage.retrieve(v.storage_path)
+                    else:
+                        static_p = Path("data/storage") / v.storage_path
+                        pdf_bytes = static_p.read_bytes() if static_p.exists() else b""
+                    if pdf_bytes:
+                        doc_res = DigitalPdfExtractor.extract(
+                            pdf_bytes, "doc.pdf", candidate.source_url
+                        )
+                        doc_text_cache[v_id] = doc_res.raw_text.lower()
+                    else:
+                        doc_text_cache[v_id] = ""
+                except Exception:
+                    doc_text_cache[v_id] = ""
+
+        raw_doc_text = doc_text_cache.get(v_id, "")
+        if not raw_doc_text:
+            invented_count += 1
+            continue
+
+        body = re.sub(r"^\[Scheme:[^\]]+\]\s*", "", candidate.chunk_content).strip()
+        meaningful_tokens = [w.lower() for w in re.findall(r"\w+", body) if len(w) > 3]
+        if not meaningful_tokens:
+            meaningful_tokens = [w.lower() for w in re.findall(r"\w+", body)]
+
+        if not meaningful_tokens:
+            invented_count += 1
+            continue
+
+        matching_tokens = sum(1 for tok in meaningful_tokens if tok in raw_doc_text)
+        match_rate = matching_tokens / len(meaningful_tokens)
+
+        # A chunk is authentic if at least 70% of its meaningful terms originate from the statutory source document
+        if match_rate < 0.70:
+            invented_count += 1
+
+    return invented_count
 
 
 class RetrievalService:
@@ -36,9 +110,12 @@ class RetrievalService:
                 "query": query,
                 "detected_script": "en",
                 "expanded_query": "",
+                "transliteration_applied": False,
+                "expanded_acronyms": [],
                 "total_results": 0,
                 "results": [],
                 "invented_chunk_count": 0,
+                "disclaimer": STATUTORY_DISCLAIMER,
             }
 
         # 1. Script detection and concept transliteration to English
@@ -72,7 +149,7 @@ class RetrievalService:
             chunk_map[ch.chunk_id] = ch
         for ch, sim in dense_matches:
             # Only consider dense match if it meets relevance threshold or has sparse support
-            if sim >= 0.35 or ch.chunk_id in chunk_map:
+            if sim >= 0.48 or ch.chunk_id in chunk_map:
                 chunk_map[ch.chunk_id] = ch
 
         if not chunk_map:
@@ -80,13 +157,12 @@ class RetrievalService:
                 "query": raw_query,
                 "detected_script": routing.detected_script.value,
                 "expanded_query": expanded_query,
+                "transliteration_applied": routing.is_transliterated,
+                "expanded_acronyms": expanded_acronyms,
                 "total_results": 0,
                 "results": [],
                 "invented_chunk_count": 0,
-                "disclaimer": (
-                    "Search results reflect retrieved statutory guidelines only. "
-                    "Application windows for academic year 2024-2025 are closed."
-                ),
+                "disclaimer": STATUTORY_DISCLAIMER,
             }
 
         fused_candidates: list[dict[str, Any]] = []
@@ -96,7 +172,7 @@ class RetrievalService:
             d_score = dense_scores.get(cid, 0.0)
 
             # Strict relevance gate: reject if zero sparse match and weak dense similarity
-            if s_rank is None and d_score < 0.35:
+            if s_rank is None and d_score < 0.48:
                 continue
 
             rrf_score = 0.0
@@ -126,6 +202,11 @@ class RetrievalService:
             top_candidates, state_filter=state_filter
         )
 
+        # 7. Dynamically compute invented chunk count by validating against source document
+        invented_count = await compute_invented_chunk_count(
+            self.session, candidates_with_provenance
+        )
+
         return {
             "query": raw_query,
             "detected_script": routing.detected_script.value,
@@ -134,9 +215,6 @@ class RetrievalService:
             "expanded_acronyms": expanded_acronyms,
             "total_results": len(candidates_with_provenance),
             "results": candidates_with_provenance,
-            "invented_chunk_count": 0,
-            "disclaimer": (
-                "Search results reflect retrieved statutory guidelines only. "
-                "Application windows for academic year 2024-2025 are closed."
-            ),
+            "invented_chunk_count": invented_count,
+            "disclaimer": STATUTORY_DISCLAIMER,
         }

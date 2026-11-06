@@ -19,7 +19,11 @@ dependencies = [
     "aiosqlite>=0.20.0",
     "pypdf>=5.0.0",
     "beautifulsoup4>=4.12.0",
-    "reportlab>=4.0.0",
+    "sentence-transformers>=3.0.0",
+    "torch>=2.0.0",
+    "pypdfium2>=5.0.0",
+    "paddleocr>=3.7.0",
+    "paddlepaddle>=3.3.0",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +33,7 @@ dev = [
     "pytest-cov>=6.0.0",
     "ruff>=0.7.2",
     "mypy>=1.13.0",
+    "reportlab>=4.0.0",
 ]
 
 [build-system]
@@ -82,6 +87,11 @@ module = [
     "pgvector.*",
     "redis.*",
     "reportlab.*",
+    "sentence_transformers.*",
+    "paddleocr.*",
+    "pypdfium2.*",
+    "torch.*",
+    "pypdf.*",
 ]
 ignore_missing_imports = true
 

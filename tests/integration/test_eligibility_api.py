@@ -117,3 +117,51 @@ async def test_validation_ranges() -> None:
             json={"marks_percent": 105.0},
         )
         assert res_marks.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_demo_profiles_exact_counts_and_displacement_flip(
+    db_session: AsyncSession, async_client: AsyncClient
+) -> None:
+    """Verify demo profiles return exact counts:
+    - Non-displaced: 2 Eligible / 4 Not Eligible / 0 Unknown
+    - Displaced: 3 Eligible / 3 Not Eligible / 0 Unknown (SCH-MN-003 flipping on is_displaced).
+    """
+    await seed_pilot_schemes(db_session)
+
+    # 1. Non-displaced profile: ST, Manipur, ₹200,000, Undergraduate, 65.0% marks
+    non_displaced_payload = {
+        "domicile_state": "MANIPUR",
+        "social_category": "ST",
+        "annual_family_income_inr": 200000.0,
+        "course_level": "UNDERGRADUATE",
+        "marks_percent": 65.0,
+        "gender": "ANY",
+        "is_displaced": False,
+        "session_id": "test-demo-non-displaced",
+    }
+    resp1 = await async_client.post("/api/v1/eligibility/evaluate", json=non_displaced_payload)
+    assert resp1.status_code == 200
+    data1 = resp1.json()
+    assert data1["total_eligible"] == 2
+    assert data1["total_not_eligible"] == 4
+    assert data1["total_unknown"] == 0
+
+    sch_003_non_displaced = next(s for s in data1["schemes"] if s["scheme_id"] == "SCH-MN-003")
+    assert sch_003_non_displaced["overall_outcome"] == "NOT_ELIGIBLE"
+
+    # 2. Displaced profile: identical except is_displaced = True
+    displaced_payload = {
+        **non_displaced_payload,
+        "is_displaced": True,
+        "session_id": "test-demo-displaced",
+    }
+    resp2 = await async_client.post("/api/v1/eligibility/evaluate", json=displaced_payload)
+    assert resp2.status_code == 200
+    data2 = resp2.json()
+    assert data2["total_eligible"] == 3
+    assert data2["total_not_eligible"] == 3
+    assert data2["total_unknown"] == 0
+
+    sch_003_displaced = next(s for s in data2["schemes"] if s["scheme_id"] == "SCH-MN-003")
+    assert sch_003_displaced["overall_outcome"] == "ELIGIBLE"

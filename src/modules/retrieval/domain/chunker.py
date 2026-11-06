@@ -9,7 +9,8 @@ from src.modules.retrieval.domain.models import KnowledgeChunk
 
 # Approximate tokenization using whitespace and punctuation boundaries
 TOKEN_PATTERN = re.compile(r"\w+|[^\w\s]")
-AADHAAR_PATTERN = re.compile(r"\b\d{12}\b")
+# Unconditional 12-digit sequence matcher (not relying on whitespace boundaries for OCR robustness)
+AADHAAR_PATTERN = re.compile(r"(?<!\d)\d{12}(?!\d)")
 
 
 def redact_pii_text(text: str) -> str:

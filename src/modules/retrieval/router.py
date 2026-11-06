@@ -71,6 +71,6 @@ async def search_guidelines(
         expanded_acronyms=search_res.get("expanded_acronyms", []),
         total_results=len(formatted_results),
         results=formatted_results,
-        invented_chunk_count=0,
+        invented_chunk_count=search_res.get("invented_chunk_count", 0),
         disclaimer=search_res["disclaimer"],
     )

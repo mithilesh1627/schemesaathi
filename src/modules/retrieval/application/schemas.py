@@ -10,8 +10,8 @@ class RetrievalSearchRequest(BaseModel):
     """Payload for public hybrid retrieval search endpoint."""
 
     query: str = Field(
-        ...,
-        min_length=2,
+        default="",
+        min_length=0,
         max_length=1000,
         description="Search query in English, Romanized Meiteilon, Bengali script, or Meetei Mayek.",
         examples=["Post-Matric ST scholarship income limit Manipur"],

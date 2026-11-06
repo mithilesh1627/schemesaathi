@@ -396,11 +396,9 @@ class SchemeKnowledgeChunk(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     chunk_content: Mapped[str] = mapped_column(Text, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, nullable=False)
-    embedding: Mapped[Any | None] = mapped_column(FlexibleVector(1536), nullable=True)
-    embedding_model: Mapped[str] = mapped_column(
-        String(64), default="text-embedding-3-small", nullable=False
-    )
-    embedding_dimension: Mapped[int] = mapped_column(Integer, default=1536, nullable=False)
+    embedding: Mapped[Any | None] = mapped_column(FlexibleVector(1024), nullable=True)
+    embedding_model: Mapped[str] = mapped_column(String(64), default="BAAI/bge-m3", nullable=False)
+    embedding_dimension: Mapped[int] = mapped_column(Integer, default=1024, nullable=False)
     model_version: Mapped[str] = mapped_column(String(32), default="v1", nullable=False)
     content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

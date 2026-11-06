@@ -9,7 +9,6 @@ strictly from official government gazettes, circulars, and M0 candidate inventor
 Zero synthetic or hallucinated schemes.
 """
 
-import hashlib
 import uuid
 from datetime import date
 from typing import Any
@@ -52,7 +51,8 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
             "version_number": 1,
             "academic_year": "2024-2025",
             "guideline_publication_date": date(2023, 8, 1),
-            "content_sha256": hashlib.sha256(b"SCH-MN-001-v1-statutory-guidelines").hexdigest(),
+            "content_sha256": "c96f3a6591bb776ab2f5ee9d52fe9a63e5bb762fd9b660c05df7f2bd568a370e",
+            "storage_path": "documents/c9/c96f3a6591bb776ab2f5ee9d52fe9a63e5bb762fd9b660c05df7f2bd568a370e.pdf",
             "verification_status": VerificationStatus.OFFICIAL_VERIFIED,
             "verified_by_user_id": "m0_statutory_auditor",
             "verification_notes": "Verified against Higher Education Manipur official circular August 2023.",
@@ -104,7 +104,8 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
             "version_number": 1,
             "academic_year": "2024-2025",
             "guideline_publication_date": date(2022, 6, 1),
-            "content_sha256": hashlib.sha256(b"SCH-MN-005-v1-statutory-guidelines").hexdigest(),
+            "content_sha256": "62be4986d375084dc770e217b475b46bf5dfd35e9a0a66c32279f97ef1661261",
+            "storage_path": "documents/62/62be4986d375084dc770e217b475b46bf5dfd35e9a0a66c32279f97ef1661261.pdf",
             "verification_status": VerificationStatus.OFFICIAL_VERIFIED,
             "verified_by_user_id": "m0_statutory_auditor",
             "verification_notes": "Verified against MoTA Centrally Sponsored Scheme Guidelines 2022.",
@@ -168,7 +169,8 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
             "version_number": 1,
             "academic_year": "2024-2025",
             "guideline_publication_date": date(2023, 7, 1),
-            "content_sha256": hashlib.sha256(b"SCH-MN-007-v1-statutory-guidelines").hexdigest(),
+            "content_sha256": "436d04efeab9db6e22c65f7cc1c816c1c4b2f664589dddf2dc7e8eed38afa64c",
+            "storage_path": "documents/43/436d04efeab9db6e22c65f7cc1c816c1c4b2f664589dddf2dc7e8eed38afa64c.pdf",
             "verification_status": VerificationStatus.OFFICIAL_VERIFIED,
             "verified_by_user_id": "m0_statutory_auditor",
             "verification_notes": "Verified against PM-YASASVI OBC Post-Matric Framework July 2023.",
@@ -209,7 +211,7 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
             "requires_otr_face_rd": True,
         },
         "benefit": {
-            "maintenance_allowance_day_scholar_annual_inr": 4000.00,
+            "maintenance_allowance_day_scholar_annual_inr": 10000.00,
             "maintenance_allowance_hosteller_annual_inr": 20000.00,
             "tuition_fee_coverage_desc": "Tuition fee reimbursement under PM-YASASVI.",
             "disbursement_mechanism": "DBT_PFMS",
@@ -232,7 +234,8 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
             "version_number": 1,
             "academic_year": "2024-2025",
             "guideline_publication_date": date(2021, 1, 1),
-            "content_sha256": hashlib.sha256(b"SCH-MN-009-v1-statutory-guidelines").hexdigest(),
+            "content_sha256": "fc413fe8c107ad0bc0f1f769f46a4dbf92c9e743d6a5e9997ae632a2ee975973",
+            "storage_path": "documents/fc/fc413fe8c107ad0bc0f1f769f46a4dbf92c9e743d6a5e9997ae632a2ee975973.pdf",
             "verification_status": VerificationStatus.OFFICIAL_VERIFIED,
             "verified_by_user_id": "m0_statutory_auditor",
             "verification_notes": "Verified against Revised Centrally Sponsored SC Post-Matric Scheme 2021.",
@@ -297,7 +300,8 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
             "version_number": 1,
             "academic_year": "2024-2025",
             "guideline_publication_date": date(2022, 6, 1),
-            "content_sha256": hashlib.sha256(b"SCH-MN-006-v1-statutory-guidelines").hexdigest(),
+            "content_sha256": "f51443a126e0b8d5af6894a8550fa476253047cb19b9c7b60c89b8be71ea2c5c",
+            "storage_path": "documents/f5/f51443a126e0b8d5af6894a8550fa476253047cb19b9c7b60c89b8be71ea2c5c.pdf",
             "verification_status": VerificationStatus.OFFICIAL_VERIFIED,
             "verified_by_user_id": "m0_statutory_auditor",
             "verification_notes": "Verified against Revised 2022 CSS MoTA Guidelines for Pre-Matric ST.",
@@ -352,7 +356,8 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
             "version_number": 1,
             "academic_year": "2024-2025",
             "guideline_publication_date": date(2023, 7, 1),
-            "content_sha256": hashlib.sha256(b"SCH-MN-003-v1-statutory-guidelines").hexdigest(),
+            "content_sha256": "3301d7d84202ff75d139549b766723418c02817c3ad51ba8f55cdb6dacb3a121",
+            "storage_path": "documents/33/3301d7d84202ff75d139549b766723418c02817c3ad51ba8f55cdb6dacb3a121.pdf",
             "verification_status": VerificationStatus.OFFICIAL_VERIFIED,
             "verified_by_user_id": "m0_statutory_auditor",
             "verification_notes": "Verified against Higher Education Manipur Notification July 2023 for displaced students.",
@@ -428,6 +433,7 @@ async def seed_pilot_schemes(session: AsyncSession) -> int:
                 academic_year=ver_data["academic_year"],
                 guideline_publication_date=ver_data["guideline_publication_date"],
                 content_sha256=ver_data["content_sha256"],
+                storage_path=ver_data.get("storage_path"),
                 lifecycle_state=DocumentLifecycleState.STORED.value,
                 verification_status=ver_data["verification_status"],
                 verified_by_user_id=ver_data["verified_by_user_id"],

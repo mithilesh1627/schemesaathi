@@ -42,7 +42,6 @@ class RetrievalRepository:
         self, query_text: str, limit: int = 20, state_filter: str | None = None
     ) -> list[tuple[SchemeKnowledgeChunk, float]]:
         """Perform sparse lexical search using PostgreSQL tsvector / GIN or SQLite token match."""
-        _ = state_filter
         bind = self.session.bind
         dialect_name = bind.dialect.name if bind else "postgresql"
 
@@ -51,33 +50,52 @@ class RetrievalRepository:
             return []
 
         if dialect_name == "postgresql":
-            # PostgreSQL Full-Text Search with ts_rank
-            ts_sql = text(
+            # PostgreSQL Full-Text Search with ts_rank and state filter applied before LIMIT
+            params: dict[str, Any] = {"q": clean_query, "limit": limit}
+            if state_filter:
+                where_state = "JOIN scheme_eligibility_rules r ON c.version_id = r.version_id"
+                where_cond = """
+                    AND (
+                        r.eligible_domiciles::text ILIKE :state_like
+                        OR r.eligible_domiciles::text ILIKE '%ALL_INDIA%'
+                        OR r.eligible_domiciles::text ILIKE '%ALL%'
+                    )
                 """
+                params["state_like"] = f"%{state_filter.upper()}%"
+            else:
+                where_state = ""
+                where_cond = ""
+
+            ts_sql = text(
+                f"""
                 SELECT c.chunk_id,
                        ts_rank_cd(to_tsvector('english', c.chunk_content), websearch_to_tsquery('english', :q)) AS rank_score
                 FROM scheme_knowledge_chunks c
+                {where_state}
                 WHERE to_tsvector('english', c.chunk_content) @@ websearch_to_tsquery('english', :q)
+                {where_cond}
                 ORDER BY rank_score DESC
                 LIMIT :limit
                 """
             )
             try:
-                res = await self.session.execute(ts_sql, {"q": clean_query, "limit": limit})
+                res = await self.session.execute(ts_sql, params)
                 rows = res.fetchall()
             except Exception:
                 # Fallback to plainto_tsquery if websearch_to_tsquery encounters complex tokens
                 fallback_sql = text(
-                    """
+                    f"""
                     SELECT c.chunk_id,
                            ts_rank_cd(to_tsvector('english', c.chunk_content), plainto_tsquery('english', :q)) AS rank_score
                     FROM scheme_knowledge_chunks c
+                    {where_state}
                     WHERE to_tsvector('english', c.chunk_content) @@ plainto_tsquery('english', :q)
+                    {where_cond}
                     ORDER BY rank_score DESC
                     LIMIT :limit
                     """
                 )
-                res = await self.session.execute(fallback_sql, {"q": clean_query, "limit": limit})
+                res = await self.session.execute(fallback_sql, params)
                 rows = res.fetchall()
 
             chunk_ids = [row[0] for row in rows]
@@ -99,6 +117,11 @@ class RetrievalRepository:
             search_tokens = meaningful_tokens if meaningful_tokens else raw_tokens
 
             stmt = select(SchemeKnowledgeChunk)
+            if state_filter:
+                stmt = stmt.join(
+                    SchemeEligibilityRule,
+                    SchemeKnowledgeChunk.version_id == SchemeEligibilityRule.version_id,
+                )
             all_res = await self.session.execute(stmt)
             candidates: list[tuple[SchemeKnowledgeChunk, float]] = []
 
@@ -117,24 +140,40 @@ class RetrievalRepository:
         self, query_vector: list[float], limit: int = 20, state_filter: str | None = None
     ) -> list[tuple[SchemeKnowledgeChunk, float]]:
         """Perform dense semantic search using pgvector cosine distance or Python dot product."""
-        _ = state_filter
         bind = self.session.bind
         dialect_name = bind.dialect.name if bind else "postgresql"
 
         if dialect_name == "postgresql":
-            # pgvector HNSW cosine distance search: operator `<=>`
-            # Cosine distance = 1.0 - cosine_similarity. Similarity = 1.0 - distance.
+            # Parameterized pgvector HNSW cosine distance search: operator `<=>` with CAST(:vec AS vector)
             vec_literal = "[" + ",".join(str(f) for f in query_vector) + "]"
+            params: dict[str, Any] = {"vec": vec_literal, "limit": limit}
+
+            if state_filter:
+                where_state = "JOIN scheme_eligibility_rules r ON c.version_id = r.version_id"
+                where_cond = """
+                    AND (
+                        r.eligible_domiciles::text ILIKE :state_like
+                        OR r.eligible_domiciles::text ILIKE '%ALL_INDIA%'
+                        OR r.eligible_domiciles::text ILIKE '%ALL%'
+                    )
+                """
+                params["state_like"] = f"%{state_filter.upper()}%"
+            else:
+                where_state = ""
+                where_cond = ""
+
             sql = text(
                 f"""
-                SELECT chunk_id, (embedding <=> '{vec_literal}') as distance
-                FROM scheme_knowledge_chunks
-                WHERE embedding IS NOT NULL
+                SELECT c.chunk_id, (c.embedding <=> CAST(:vec AS vector)) as distance
+                FROM scheme_knowledge_chunks c
+                {where_state}
+                WHERE c.embedding IS NOT NULL
+                {where_cond}
                 ORDER BY distance ASC
                 LIMIT :limit
                 """
             )
-            res = await self.session.execute(sql, {"limit": limit})
+            res = await self.session.execute(sql, params)
             rows = res.fetchall()
 
             chunk_ids = [row[0] for row in rows]
@@ -154,6 +193,11 @@ class RetrievalRepository:
         else:
             # SQLite fallback: in-memory cosine similarity
             stmt = select(SchemeKnowledgeChunk).where(SchemeKnowledgeChunk.embedding.is_not(None))
+            if state_filter:
+                stmt = stmt.join(
+                    SchemeEligibilityRule,
+                    SchemeKnowledgeChunk.version_id == SchemeEligibilityRule.version_id,
+                )
             res = await self.session.execute(stmt)
             all_chunks = res.scalars().all()
 
@@ -212,7 +256,7 @@ class RetrievalRepository:
         for row in res.all():
             prov_map[row[0].chunk_id] = (row[1], row[2], row[3], row[4])
 
-        today = date(2026, 11, 5)  # Statutory audit reference date
+        today = date.today()
         results: list[RetrievalCandidate] = []
 
         for item in scored_candidates:

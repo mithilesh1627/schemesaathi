@@ -1,12 +1,16 @@
 """Integration and Golden Retrieval Tests against Public Hybrid Search API."""
 
+import hashlib
+import io
 import uuid
 from datetime import date
 
 import pytest
 from httpx import AsyncClient
+from reportlab.pdfgen import canvas
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.storage import get_storage_backend
 from src.modules.catalog.domain.enums import (
     PortalType,
     PortalWindowStatus,
@@ -207,12 +211,27 @@ async def test_pan_india_state_agnostic_fixture_query(
     db_session.add(fixture_scheme)
 
     ver_id = uuid.uuid4()
+    storage = get_storage_backend()
+    pdf_buf = io.BytesIO()
+    c = canvas.Canvas(pdf_buf)
+    c.drawString(
+        50,
+        750,
+        "Directorate of Higher Education, Assam. Financial scholarship for students domiciled in the State of Assam.",
+    )
+    c.save()
+    raw_doc = pdf_buf.getvalue()
+    doc_hash = hashlib.sha256(raw_doc).hexdigest()
+    storage_path = f"documents/{doc_hash[:2]}/{doc_hash}.pdf"
+    await storage.store(storage_path, raw_doc)
+
     fixture_version = SchemeVersion(
         version_id=ver_id,
         scheme_id=fixture_scheme_id,
         version_number=1,
         academic_year="2024-2025",
-        content_sha256="aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+        content_sha256=doc_hash,
+        storage_path=storage_path,
         lifecycle_state="EXTRACTED",
         verification_status=VerificationStatus.OFFICIAL_VERIFIED,
     )
@@ -254,8 +273,8 @@ async def test_pan_india_state_agnostic_fixture_query(
         token_count=35,
         embedding=emb,
         embedding_model=local_embedder.model_name,
-        embedding_dimension=1536,
-        model_version="v1",
+        embedding_dimension=local_embedder.dimension,
+        model_version=local_embedder.model_version,
         content_sha256="112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00",
     )
     db_session.add(fixture_chunk)
@@ -272,3 +291,94 @@ async def test_pan_india_state_agnostic_fixture_query(
     top_schemes = [r["scheme_id"] for r in data["results"][:5]]
     assert fixture_scheme_id in top_schemes
     assert data["invented_chunk_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_whitespace_and_empty_query_graceful_handling(async_client: AsyncClient) -> None:
+    """Verify empty or whitespace-only queries return 200 with disclaimer and 0 results."""
+    # 1. Whitespace query
+    resp1 = await async_client.post("/api/v1/retrieval/search", json={"query": "    ", "top_k": 5})
+    assert resp1.status_code == 200
+    data1 = resp1.json()
+    assert data1["total_results"] == 0
+    assert len(data1["results"]) == 0
+    assert data1["invented_chunk_count"] == 0
+    assert "disclaimer" in data1
+    assert "closed" in data1["disclaimer"].lower()
+
+    # 2. Empty query
+    resp2 = await async_client.post("/api/v1/retrieval/search", json={"query": "", "top_k": 5})
+    assert resp2.status_code == 200
+    data2 = resp2.json()
+    assert data2["total_results"] == 0
+    assert data2["invented_chunk_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_artificial_chunk_triggers_invented_chunk_count(
+    db_session: AsyncSession, async_client: AsyncClient
+) -> None:
+    """Verify that an artificial chunk without source document validation causes invented_chunk_count > 0."""
+    fake_scheme_id = "SCH-FAKE-999"
+    fake_scheme = Scheme(
+        scheme_id=fake_scheme_id,
+        official_code="FAKE_999",
+        title_en="Fake Hallucinated Scholarship Scheme",
+        issuing_level=SchemeLevel.STATE_SECTOR,
+        ministry_or_department="Department of Imagination",
+        implementing_agency="None",
+        canonical_source_url="https://fake.gov.in",
+        guidelines_document_url="https://fake.gov.in/fake.pdf",
+    )
+    db_session.add(fake_scheme)
+
+    fake_ver_id = uuid.uuid4()
+    # Provide a storage path to a non-existent document or document without the text
+    fake_version = SchemeVersion(
+        version_id=fake_ver_id,
+        scheme_id=fake_scheme_id,
+        version_number=1,
+        academic_year="2024-2025",
+        content_sha256="0000000000000000000000000000000000000000000000000000000000000000",
+        storage_path="documents/00/nonexistent_fake_doc.pdf",
+        lifecycle_state="STORED",
+        verification_status=VerificationStatus.OFFICIAL_PROVISIONAL,
+    )
+    db_session.add(fake_version)
+
+    fake_content = (
+        "[Scheme: Fake Hallucinated Scholarship Scheme | Section: Fake Scope | Academic Year: 2024-2025]\n\n"
+        "Completely synthetic hallucinated text quantum astrophysics Martian grant alien assistance."
+    )
+    emb = local_embedder.embed_text(fake_content)
+    fake_chunk = SchemeKnowledgeChunk(
+        chunk_id=uuid.uuid4(),
+        version_id=fake_ver_id,
+        scheme_id=fake_scheme_id,
+        language_code="en",
+        section_title="Fake Scope",
+        chunk_content=fake_content,
+        token_count=30,
+        embedding=emb,
+        embedding_model=local_embedder.model_name,
+        embedding_dimension=local_embedder.dimension,
+        model_version=local_embedder.model_version,
+        content_sha256="ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    )
+    db_session.add(fake_chunk)
+    await db_session.commit()
+
+    # Search for this exact fake query
+    resp = await async_client.post(
+        "/api/v1/retrieval/search",
+        json={
+            "query": "synthetic hallucinated quantum astrophysics Martian grant alien",
+            "top_k": 5,
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total_results"] > 0
+    # Because this chunk has no valid source document on disk matching its text,
+    # invented_chunk_count MUST be greater than 0!
+    assert data["invented_chunk_count"] > 0
