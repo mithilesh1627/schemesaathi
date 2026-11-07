@@ -59,13 +59,22 @@ async def db_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, N
         await session.rollback()
 
 
+@pytest.fixture(autouse=True)
+def configure_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure test environment is set so chat tests run offline with deterministic stub."""
+    monkeypatch.setattr(settings, "ENVIRONMENT", "testing")
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "test_stub")
+
+
 @pytest_asyncio.fixture
 async def async_client(
     db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> AsyncGenerator[AsyncClient, None]:
     """Provide an async test client configured with the test database session and admin credentials."""
-    # Configure test admin key and isolated temporary storage directory
+    # Configure test admin key, test environment, and isolated temporary storage directory
     test_admin_key = "test-admin-key-for-unit-tests-1234"
+    monkeypatch.setattr(settings, "ENVIRONMENT", "testing")
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "test_stub")
     monkeypatch.setattr(settings, "ADMIN_API_KEY", test_admin_key)
     monkeypatch.setattr(settings, "STORAGE_BASE_DIR", str(tmp_path))
 

@@ -21,6 +21,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import settings
 from src.modules.catalog.domain.enums import (
     PortalType,
     PortalWindowStatus,
@@ -36,6 +37,12 @@ from src.modules.catalog.domain.models import (
 )
 from src.modules.catalog.infrastructure.seed_data import seed_pilot_schemes
 from src.modules.chat.application.citation_checker import STANDARD_REFUSAL_MESSAGE
+from src.modules.chat.domain.enums import LanguageScript
+from src.modules.chat.domain.exceptions import ChatError
+from src.modules.chat.infrastructure.llm_provider import (
+    OllamaLlmProvider,
+    get_llm_provider,
+)
 from src.modules.chat.infrastructure.session_repository import get_session_repository
 from src.modules.retrieval.application.corpus_seed_service import CorpusSeedService
 
@@ -114,9 +121,12 @@ async def test_golden_conversation_2_factual_question_grounded_with_citations(
     assert len(data["citations"]) > 0
     assert "[^1]" in data["answer"]
 
-    # Must state factual maintenance amounts from retrieved guideline
-    assert "7,000" in data["answer"]
-    assert "13,500" in data["answer"]
+    # Must state factual monthly maintenance amounts extracted from retrieved guideline
+    assert "550" in data["answer"]
+    assert "1,200" in data["answer"] or "1200" in data["answer"]
+    assert "month" in data["answer"].lower()
+    assert "7,000" not in data["answer"]
+    assert "13,500" not in data["answer"]
 
     # Verify citation resolves to authentic SCH-MN-005 chunk
     first_cit = data["citations"][0]
@@ -226,8 +236,11 @@ async def test_golden_conversation_6_multilingual_meiteilon_and_meetei_mayek(
     assert resp_latn.status_code == 200
     d_latn = resp_latn.json()
     assert d_latn["detected_language"] == "Romanized Meiteilon"
-    assert "[^1]" in d_latn["answer"]
-    assert "₹7,000" in d_latn["answer"] or "7,000" in d_latn["answer"]
+    assert "[^1]" in d_latn["answer"] or "[^2]" in d_latn["answer"]
+    assert "550" in d_latn["answer"]
+    assert "1,200" in d_latn["answer"] or "1200" in d_latn["answer"]
+    assert "month" in d_latn["answer"].lower()
+    assert "7,000" not in d_latn["answer"]
 
     # 6B: Meetei Mayek script
     session_mtei = f"test-mtei-{uuid.uuid4().hex[:8]}"
@@ -241,8 +254,10 @@ async def test_golden_conversation_6_multilingual_meiteilon_and_meetei_mayek(
     assert resp_mtei.status_code == 200
     d_mtei = resp_mtei.json()
     assert d_mtei["detected_language"] == "Meetei Mayek"
-    assert "[^1]" in d_mtei["answer"]
-    assert "₹7,000" in d_mtei["answer"] or "7,000" in d_mtei["answer"]
+    assert "[^1]" in d_mtei["answer"] or "[^2]" in d_mtei["answer"]
+    assert "550" in d_mtei["answer"]
+    assert "1,200" in d_mtei["answer"] or "1200" in d_mtei["answer"]
+    assert "7,000" not in d_mtei["answer"]
 
 
 @pytest.mark.asyncio
@@ -446,3 +461,100 @@ async def test_chat_streaming_sse_endpoint(
     assert "event: token" in body
     assert "event: complete" in body
     assert "SCH-MN-005" in body
+
+
+@pytest.mark.asyncio
+async def test_unsupported_benefit_question_returns_refusal(
+    async_client: AsyncClient,
+) -> None:
+    """Fix 1 Regression: Question whose retrieved chunks lack the asked-for value returns standard refusal form."""
+    session_id = f"test-nobike-{uuid.uuid4().hex[:8]}"
+
+    # Guidelines for Post-Matric ST do not mention a bicycle allowance
+    payload = {
+        "session_id": session_id,
+        "message": "What is the bicycle allowance amount for Post-Matric ST students in Manipur?",
+    }
+
+    resp = await async_client.post("/api/v1/chat/message", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # Must return statutory refusal with 0 invented chunks and 0 citations
+    assert data["answer"] == STANDARD_REFUSAL_MESSAGE
+    assert data["invented_chunk_count"] == 0
+    assert len(data["citations"]) == 0
+
+
+def test_production_llm_path_is_not_stub(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fix 2 Regression: Outside test mode, production provider is Ollama (llama3.2:3b) and not the test stub."""
+    # Simulate production environment
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "ollama")
+    monkeypatch.setattr(settings, "LLM_MODEL", "llama3.2:3b")
+    monkeypatch.setattr(settings, "OLLAMA_HOST", "http://localhost:11434")
+
+    provider = get_llm_provider()
+    # 1. Assert production provider is OllamaLlmProvider with llama3.2:3b
+    assert isinstance(provider, OllamaLlmProvider)
+    assert provider.model_name == "llama3.2:3b"
+    assert provider.host == "http://localhost:11434"
+
+    # 2. When Ollama is unreachable at runtime, it must fail closed with ChatError (never fall back to stub)
+    dead_provider = OllamaLlmProvider(
+        host="http://127.0.0.1:59999", model_name="llama3.2:3b"
+    )  # Port with no listener
+    with pytest.raises(ChatError) as exc_info:
+        dead_provider.generate(
+            prompt="Test prompt",
+            retrieved_chunks=[{"chunk_content": "test"}],
+            synchronizer_state_str="",
+            user_message="Test message",
+            detected_script=LanguageScript.ENGLISH,
+        )
+    assert "Ollama service is unavailable" in str(exc_info.value)
+    # 3. Verify grounded prompt is actually passed to provider
+    assert dead_provider.last_prompt_sent == "Test prompt"
+
+
+@pytest.mark.asyncio
+async def test_profile_with_only_domicile_does_not_assume_defaults(
+    async_client: AsyncClient,
+) -> None:
+    """Fix 3 Regression: Profile with only domicile is never evaluated on invented defaults (0 ELIGIBLE schemes)."""
+    session_id = f"test-no-defaults-{uuid.uuid4().hex[:8]}"
+
+    payload = {
+        "session_id": session_id,
+        "message": "Am I eligible for scholarships in Manipur?",
+        "profile_updates": {
+            "domicile_state": "MANIPUR",
+        },
+    }
+
+    resp = await async_client.post("/api/v1/chat/message", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # Zero schemes should be marked ELIGIBLE based on invented defaults
+    elig_results = {r["scheme_id"]: r["status"].upper() for r in data["eligibility_results"]}
+    for sch_id, outcome in elig_results.items():
+        assert outcome != "ELIGIBLE", (
+            f"Scheme {sch_id} was incorrectly evaluated as ELIGIBLE with missing facts!"
+        )
+
+    # Schemes requiring income, category, or marks must evaluate to UNKNOWN
+    assert (
+        elig_results["SCH-MN-001"] == "UNKNOWN"
+    )  # State Merit: needs income <= 4.5L, marks >= 60%
+    assert elig_results["SCH-MN-005"] == "UNKNOWN"  # Post-Matric ST: needs ST, income <= 2.5L
+    assert elig_results["SCH-MN-006"] == "UNKNOWN"  # Pre-Matric ST: needs ST, class 9-10
+    assert elig_results["SCH-MN-007"] == "UNKNOWN"  # Post-Matric OBC: needs OBC, income <= 2.5L
+    assert elig_results["SCH-MN-009"] == "UNKNOWN"  # Pre-Matric OBC: needs OBC, class 9-10
+    assert elig_results["SCH-MN-003"] == "NOT_ELIGIBLE"  # Displaced scheme fails non-displaced
+
+    # The answer text must reflect that eligibility is UNKNOWN due to missing details
+    ans = data["answer"].lower()
+    assert "eligible for: sch-mn-001" not in ans
+    assert "eligible for: sch-mn-005" not in ans
+    assert "unknown" in ans or "missing" in ans

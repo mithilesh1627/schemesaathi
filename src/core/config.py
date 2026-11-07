@@ -98,6 +98,24 @@ class Settings(BaseSettings):
         description="Administrative secret API key for write endpoints (must be set in environment)",
     )
 
+    # Conversational LLM Configuration
+    LLM_PROVIDER: str = Field(
+        default="ollama",
+        description="Conversational LLM provider: 'ollama' (default local), 'external', or 'test_stub'",
+    )
+    LLM_MODEL: str = Field(
+        default="llama3.2:3b",
+        description="Local Ollama or external LLM model name (default: llama3.2:3b)",
+    )
+    OLLAMA_HOST: str = Field(
+        default="http://localhost:11434",
+        description="Base URL for local Ollama service",
+    )
+    LLM_API_KEY: str | None = Field(
+        default=None,
+        description="Optional API key for external LLM provider loaded strictly from environment",
+    )
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: str | list[str]) -> list[str]:

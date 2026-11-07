@@ -114,21 +114,21 @@ class ChatService:
 
         if is_eligibility_query:
             facts = session.profile_facts
-            # Only evaluate if minimum facts (e.g. social category or income or domicile) exist
+            # Only evaluate if profile facts exist (never assume missing values or invent defaults)
             if (
                 facts.domicile_state
                 or facts.social_category
                 or facts.annual_family_income_inr is not None
+                or facts.course_level
+                or facts.marks_percent is not None
             ):
                 profile_req = StudentProfileRequest(
-                    domicile_state=facts.domicile_state or "MANIPUR",
-                    social_category=facts.social_category or "GENERAL",
-                    annual_family_income_inr=facts.annual_family_income_inr
-                    if facts.annual_family_income_inr is not None
-                    else 0.0,
-                    course_level=facts.course_level or "UNDERGRADUATE",
+                    domicile_state=facts.domicile_state,
+                    social_category=facts.social_category,
+                    annual_family_income_inr=facts.annual_family_income_inr,
+                    course_level=facts.course_level,
                     marks_percent=facts.marks_percent,
-                    gender=facts.gender or "ANY",
+                    gender=facts.gender,
                     is_displaced=facts.is_displaced if facts.is_displaced is not None else False,
                     session_id=session.session_id,
                 )
