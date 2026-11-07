@@ -288,6 +288,14 @@ class CorpusSeedService:
                 )
 
                 # Step 8: Generate 1024-dim BAAI/bge-m3 embeddings and persist chunks
+                uncached = [
+                    ch.chunk_content
+                    for ch in chunks
+                    if ch.chunk_content.strip() not in local_embedder._cache
+                ]
+                if uncached:
+                    local_embedder.embed_batch(uncached)
+
                 for ch in chunks:
                     emb = local_embedder.embed_text(ch.chunk_content)
                     db_chunk = SchemeKnowledgeChunk(

@@ -17,6 +17,7 @@ from src.core.middleware import RequestIDMiddleware, RequestSizeLimitMiddleware
 from src.core.redis import close_redis
 from src.modules.catalog.infrastructure.seed_data import seed_pilot_schemes
 from src.modules.catalog.router import router as catalog_router
+from src.modules.chat.router import router as chat_router
 from src.modules.eligibility.router import router as eligibility_router
 from src.modules.retrieval.application.corpus_seed_service import CorpusSeedService
 from src.modules.retrieval.router import router as retrieval_router
@@ -96,6 +97,7 @@ def create_app() -> FastAPI:
     app.include_router(catalog_router, prefix=settings.API_V1_PREFIX)
     app.include_router(eligibility_router, prefix=settings.API_V1_PREFIX)
     app.include_router(retrieval_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(chat_router, prefix=settings.API_V1_PREFIX)
 
     # 5. Register Thin Demo Webpage
     @app.get(
@@ -110,6 +112,20 @@ def create_app() -> FastAPI:
         if template_path.is_file():
             return HTMLResponse(content=template_path.read_text(encoding="utf-8"))
         return HTMLResponse(content="<h1>Demo template not found</h1>", status_code=404)
+
+    # 6. Register Thin Chat Demo Webpage
+    @app.get(
+        "/chat",
+        response_class=HTMLResponse,
+        tags=["Demo"],
+        summary="Manipur Pilot Grounded Chat Demo",
+    )
+    async def get_chat_page() -> HTMLResponse:
+        """Serve minimal single-page grounded chat demo for reviewer evaluation."""
+        template_path = Path(__file__).parent / "templates" / "chat.html"
+        if template_path.is_file():
+            return HTMLResponse(content=template_path.read_text(encoding="utf-8"))
+        return HTMLResponse(content="<h1>Chat demo template not found</h1>", status_code=404)
 
     return app
 

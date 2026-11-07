@@ -1,5 +1,6 @@
 """Chunk and Vector Retrieval Repository supporting PostgreSQL pgvector + GIN and SQLite fallback."""
 
+import re
 import uuid
 from datetime import date
 from typing import Any
@@ -111,8 +112,30 @@ class RetrievalRepository:
 
         else:
             # SQLite / Mock fallback: lexical token overlap with domain stopword filtering
-            raw_tokens = [t.lower() for t in clean_query.split() if len(t) > 2]
-            stopwords = {"the", "and", "for", "with", "from", "scheme", "scholarship", "government"}
+            raw_tokens = [
+                t.lower() for t in re.sub(r"[^\w\s]", " ", clean_query).split() if len(t) > 2
+            ]
+            stopwords = {
+                "the",
+                "and",
+                "for",
+                "with",
+                "from",
+                "scheme",
+                "scholarship",
+                "government",
+                "when",
+                "what",
+                "where",
+                "which",
+                "how",
+                "why",
+                "who",
+                "is",
+                "are",
+                "can",
+                "will",
+            }
             meaningful_tokens = [t for t in raw_tokens if t not in stopwords]
             search_tokens = meaningful_tokens if meaningful_tokens else raw_tokens
 
@@ -129,7 +152,7 @@ class RetrievalRepository:
                 content_lower = c.chunk_content.lower()
                 matches = sum(1 for tok in search_tokens if tok in content_lower)
                 threshold = 1 if len(search_tokens) <= 2 else 2
-                if matches >= threshold and (matches / len(search_tokens)) >= 0.30:
+                if matches >= threshold and (matches / len(search_tokens)) >= 0.25:
                     score = matches / len(search_tokens)
                     candidates.append((c, score))
 

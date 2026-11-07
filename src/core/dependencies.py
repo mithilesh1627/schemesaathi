@@ -98,3 +98,45 @@ async def enforce_write_rate_limit(request: Request) -> None:
         raise ServiceUnavailableError(
             "Rate limiting service is unavailable. Administrative write operations are temporarily disabled."
         ) from exc
+
+
+async def enforce_chat_rate_limit(request: Request) -> None:
+    """Enforce Redis-backed rate limiting on conversational LLM endpoint.
+
+    Returns 429 with Retry-After header if limit exceeded.
+    Fails closed (503) if Redis is unreachable to prevent unthrottled LLM invocations.
+    """
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+    elif request.client:
+        client_ip = request.client.host
+    else:
+        client_ip = "unknown_client"
+
+    key = f"rate_limit:chat:{client_ip}"
+    limit = settings.RATE_LIMIT_PER_MINUTE
+
+    try:
+        redis = get_redis_client()
+        count = await redis.incr(key)
+        if count == 1:
+            await redis.expire(key, 60)
+
+        if count > limit:
+            ttl = await redis.ttl(key)
+            retry_after = max(ttl, 1)
+            logger.warning(
+                "Chat rate limit exceeded for client %s: %d requests (limit: %d/min)",
+                client_ip,
+                count,
+                limit,
+            )
+            raise RateLimitExceededError(retry_after=retry_after)
+    except RateLimitExceededError:
+        raise
+    except Exception as exc:
+        logger.error("Redis rate limit failure on chat endpoint; failing closed: %s", exc)
+        raise ServiceUnavailableError(
+            "Rate limiting service is unavailable. Conversational endpoints are temporarily disabled."
+        ) from exc

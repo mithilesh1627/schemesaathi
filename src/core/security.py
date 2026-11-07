@@ -74,6 +74,10 @@ def redact_aadhaar_pii(text: str) -> str:
     return AADHAAR_PATTERN.sub("[REDACTED_AADHAAR]", text)
 
 
+# Public alias for text redaction
+redact_pii_text = redact_aadhaar_pii
+
+
 def sanitize_sensitive_data(val: Any) -> Any:
     """Recursively scrub prospective Aadhaar sequences from strings, dicts, lists, and tuples."""
     if isinstance(val, Exception):

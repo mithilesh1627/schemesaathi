@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SchemeSaathi — Grounded Chat Demo</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --border: #e2e8f0;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success-bg: #ecfdf5;
+      --success-text: #065f46;
+      --success-border: #a7f3d0;
+      --danger-bg: #fef2f2;
+      --danger-text: #991b1b;
+      --danger-border: #fecaca;
+      --warn-bg: #fffbeb;
+      --warn-text: #92400e;
+      --warn-border: #fde68a;
+      --user-msg: #e0f2fe;
+      --asst-msg: #ffffff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 1.5rem; line-height: 1.5; }
+    .container { max-width: 960px; margin: 0 auto; }
+    .banner {
+      background-color: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      color: var(--warn-text);
+      padding: 0.875rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+    header { margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+    h1 { font-size: 1.75rem; color: #1e293b; }
+    .badge { font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 9999px; background: #e2e8f0; }
+    .chat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-bottom: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      height: 600px;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding-right: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .message {
+      max-width: 85%;
+      padding: 1rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+    }
+    .user-message {
+      align-self: flex-end;
+      background-color: var(--user-msg);
+      border: 1px solid #bae6fd;
+    }
+    .assistant-message {
+      align-self: flex-start;
+      background-color: var(--asst-msg);
+      border: 1px solid var(--border);
+    }
+    .eligibility-box {
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      background-color: #f1f5f9;
+      border-left: 4px solid var(--primary);
+      font-size: 0.85rem;
+    }
+    .eligibility-box h4 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #334155;
+      margin-bottom: 0.35rem;
+    }
+    .citation-list {
+      margin-top: 0.75rem;
+      padding-top: 0.5rem;
+      border-top: 1px dashed var(--border);
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .citation-item {
+      margin-bottom: 0.25rem;
+    }
+    .citation-item a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .citation-item a:hover {
+      text-decoration: underline;
+    }
+    .window-tag {
+      display: inline-block;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      background-color: #fee2e2;
+      color: #991b1b;
+      margin-left: 0.5rem;
+    }
+    .chat-input-bar {
+      display: flex;
+      gap: 0.75rem;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+    input[type="text"]:focus {
+      border-color: var(--primary);
+    }
+    button {
+      padding: 0.75rem 1.5rem;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: var(--primary-hover);
+    }
+    .auditor-box {
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      background-color: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      font-size: 0.85rem;
+    }
+    .auditor-box h4 {
+      color: var(--warn-text);
+      margin-bottom: 0.35rem;
+    }
+    .warning-text {
+      font-size: 0.75rem;
+      color: #b45309;
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px dashed #fde68a;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="banner">
+      Demo — Manipur pilot. Not a public launch.
+    </div>
+    <header>
+      <div>
+        <h1>SchemeSaathi Grounded Chat</h1>
+        <p style="color: var(--muted); font-size: 0.9rem;">
+          State-Synchronized, Citation-Checked Grounded Assistant
+        </p>
+      </div>
+      <div>
+        <span class="badge" id="session-badge">Session: Initializing...</span>
+      </div>
+    </header>
+
+    <div class="chat-card">
+      <div class="chat-messages" id="messages-container">
+        <div class="message assistant-message">
+          <strong>SchemeSaathi:</strong> Welcome! You can ask questions about Manipur pilot scholarship guidelines, check your eligibility, or audit your document readiness. All answers are strictly grounded in official gazettes and circulars with inline citations.
+        </div>
+      </div>
+
+      <div class="chat-input-bar">
+        <input type="text" id="user-input" placeholder="Type a question in English or Romanized Meiteilon (e.g., 'What is ST post-matric allowance?')" />
+        <button id="send-btn" onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let sessionId = "session-" + Math.random().toString(36).substring(2, 10);
+    document.getElementById("session-badge").innerText = "Session: " + sessionId;
+
+    const inputField = document.getElementById("user-input");
+    inputField.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") {
+        sendMessage();
+      }
+    });
+
+    async function sendMessage() {
+      const text = inputField.value.trim();
+      if (!text) return;
+
+      inputField.value = "";
+      const container = document.getElementById("messages-container");
+
+      // Append user message
+      const userDiv = document.createElement("div");
+      userDiv.className = "message user-message";
+      userDiv.innerHTML = `<strong>You:</strong> ${escapeHtml(text)}`;
+      container.appendChild(userDiv);
+      container.scrollTop = container.scrollHeight;
+
+      // Temporary assistant indicator
+      const asstDiv = document.createElement("div");
+      asstDiv.className = "message assistant-message";
+      asstDiv.innerHTML = "<em>Reasoning with grounded hybrid retrieval and state synchronizer...</em>";
+      container.appendChild(asstDiv);
+      container.scrollTop = container.scrollHeight;
+
+      try {
+        const response = await fetch("/api/v1/chat/message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: sessionId,
+            message: text
+          })
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          asstDiv.innerHTML = `<span style="color: var(--danger-text)"><strong>Error:</strong> ${err.message || 'Request failed'}</span>`;
+          return;
+        }
+
+        const data = await response.json();
+        renderAssistantResponse(asstDiv, data);
+      } catch (err) {
+        asstDiv.innerHTML = `<span style="color: var(--danger-text)"><strong>Network Error:</strong> Failed to connect to chat API.</span>`;
+      } finally {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+
+    function renderAssistantResponse(element, data) {
+      let html = `<div><strong>SchemeSaathi:</strong> ${formatAnswerText(data.answer, data.citations)}</div>`;
+
+      // Deterministic eligibility block (labelled separate block)
+      if (data.eligibility_results && data.eligibility_results.length > 0) {
+        html += `<div class="eligibility-box">
+          <h4>Deterministic Eligibility Engine Results</h4>
+          <ul style="padding-left: 1.25rem;">`;
+        for (const res of data.eligibility_results) {
+          const isEligible = res.status.toUpperCase() === "ELIGIBLE";
+          const color = isEligible ? "#059669" : "#dc2626";
+          html += `<li><strong>${escapeHtml(res.scheme_id)}</strong> (${escapeHtml(res.scheme_title)}): 
+            <span style="color: ${color}; font-weight: 700;">${escapeHtml(res.status)}</span> — ${escapeHtml(res.reason)}</li>`;
+        }
+        html += `</ul></div>`;
+      }
+
+      // Document Readiness Auditor block
+      if (data.document_audit) {
+        html += `<div class="auditor-box">
+          <h4>Pre-Submission Document Readiness Checklist</h4>
+          <p>${escapeHtml(data.document_audit.summary_text)}</p>
+          <ul style="padding-left: 1.25rem; margin-top: 0.35rem;">`;
+        for (const doc of data.document_audit.documents) {
+          html += `<li><strong>${escapeHtml(doc.document_name)}:</strong> ${escapeHtml(doc.status)} (${escapeHtml(doc.reason_or_guidance)})</li>`;
+        }
+        html += `</ul>
+          <div class="warning-text"><strong>${escapeHtml(data.document_audit.npci_apb_warning)}</strong></div>
+          <div class="warning-text"><strong>${escapeHtml(data.document_audit.otr_face_rd_warning)}</strong></div>
+        </div>`;
+      }
+
+      // Citations List
+      if (data.citations && data.citations.length > 0) {
+        html += `<div class="citation-list">
+          <strong>Statutory Citations:</strong>`;
+        for (const c of data.citations) {
+          const closeTag = c.window_close_date ? `<span class="window-tag">Window Closed: ${c.window_close_date}</span>` : "";
+          html += `<div class="citation-item">
+            [^${c.citation_number}] <strong>${escapeHtml(c.scheme_id)}</strong> — ${escapeHtml(c.section)}:
+            <a href="${escapeHtml(c.source_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(c.source_url)}</a>
+            ${closeTag}
+          </div>`;
+        }
+        html += `</div>`;
+      }
+
+      element.innerHTML = html;
+    }
+
+    function formatAnswerText(text, citations) {
+      let formatted = escapeHtml(text);
+      if (citations && citations.length > 0) {
+        for (const c of citations) {
+          const marker = `[^${c.citation_number}]`;
+          const linkedMarker = `<sup><a href="${escapeHtml(c.source_url)}" target="_blank" style="color: var(--primary); font-weight: bold;">[${c.citation_number}]</a></sup>`;
+          formatted = formatted.split(marker).join(linkedMarker);
+        }
+      }
+      return formatted;
+    }
+
+    function escapeHtml(string) {
+      const entityMap = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+        '/': '&#x2F;'
+      };
+      return String(string).replace(/[&<>"'\/]/g, function (s) {
+        return entityMap[s];
+      });
+    }
+  </script>
+</body>
+</html>

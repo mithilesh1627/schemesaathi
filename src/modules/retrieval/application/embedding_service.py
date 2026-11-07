@@ -80,7 +80,7 @@ class BgeM3Embedder:
             return [list(empty_vec) for _ in texts]
 
         model = self._get_model()
-        embeddings_arr = model.encode(clean_texts, normalize_embeddings=True)
+        embeddings_arr = model.encode(clean_texts, normalize_embeddings=True, batch_size=32)
         results: list[list[float]] = []
         for i, raw_vec in enumerate(embeddings_arr):
             if not clean_texts[i]:
@@ -88,7 +88,9 @@ class BgeM3Embedder:
                 vec[0] = 1.0
                 results.append(vec)
             else:
-                results.append([float(x) for x in raw_vec])
+                vec = [float(x) for x in raw_vec]
+                results.append(vec)
+                self._cache[clean_texts[i]] = vec
         return results
 
 
