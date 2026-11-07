@@ -4,8 +4,10 @@
 **Status:** Ready for re-review as a Sprint 3 retrieval build  
 **Baseline Head:** `cdd548c`  
 **Baseline CI Run:** [42304598902](https://github.com/mithilesh1627/schemesaathi/actions/runs/42304598902) (158 passed in CI with PostgreSQL 16 + pgvector)  
+**New Verified Head:** `54180ce`  
+**New Verified CI Run:** [42315053006](https://github.com/mithilesh1627/schemesaathi/actions/runs/42315053006) (159 passed in CI with PostgreSQL 16 + pgvector)  
 **Observed Test Count (Local):** 151 passed, 8 skipped (PostgreSQL tests guarded by `skip_if_no_pg` for local Windows non-CI runs), 0 failed out of 159 collected  
-**Observed Test Count (CI with PostgreSQL 16 + pgvector):** 158 passed on baseline head `cdd548c`; 159 passed with added real scanned PDF OCR test  
+**Observed Test Count (CI with PostgreSQL 16 + pgvector):** 159 passed, 0 failed  
 
 ---
 
