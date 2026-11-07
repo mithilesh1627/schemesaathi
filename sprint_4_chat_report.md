@@ -5,9 +5,10 @@
 **Date:** 2026-11-07  
 **Repository:** `mithilesh1627/schemesaathi`  
 **Baseline Head:** `805b03c` (CI Run `42360274218` on commit `bbaec60`)  
+**Verified Head:** `38edd89` (Green CI Run `42377690880`)  
 **Sprint 3 Baseline Observed Test Count:** 151 passed, 8 skipped locally (159 collected; 159 passed in CI with PostgreSQL 16 + pgvector)  
 **Sprint 4 Initial Test Count:** 172 passed, 8 skipped locally (180 passed in CI with PostgreSQL 16 + pgvector and Redis)  
-**Sprint 4 Remediation Observed Test Count:** 177 passed, 8 skipped locally (185 collected; 185 expected in CI with PostgreSQL 16 + pgvector and Redis)  
+**Sprint 4 Remediation Observed Test Count:** 177 passed, 8 skipped locally (185 collected; 185 passed in CI with PostgreSQL 16 + pgvector and Redis)  
 
 ---
 
