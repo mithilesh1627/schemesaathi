@@ -5,7 +5,9 @@
 **Date:** 2026-11-07  
 **Repository:** `mithilesh1627/schemesaathi`  
 **Baseline Head:** `1382ec8` (Green CI Run `42315790572`)  
-**Baseline Observed Test Count:** 151 passed, 8 skipped locally (159 collected; 159 passed in CI with PostgreSQL 16 + pgvector)
+**Verified Head:** `bbaec60` (Green CI Run `42360274218`)  
+**Baseline Observed Test Count:** 151 passed, 8 skipped locally (159 collected; 159 passed in CI with PostgreSQL 16 + pgvector)  
+**Sprint 4 Verified Test Count:** 172 passed, 8 skipped locally (180 passed in CI with PostgreSQL 16 + pgvector and Redis)  
 
 ---
 
