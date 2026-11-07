@@ -6,7 +6,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from src.api.health import router as health_router
 from src.core.config import settings
@@ -99,7 +100,57 @@ def create_app() -> FastAPI:
     app.include_router(retrieval_router, prefix=settings.API_V1_PREFIX)
     app.include_router(chat_router, prefix=settings.API_V1_PREFIX)
 
-    # 5. Register Thin Demo Webpage
+    # 5. Mount Static Assets
+    static_dir = Path(__file__).parent / "static"
+    if static_dir.is_dir():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+    # 6. Register PWA Shell Routes
+    @app.get(
+        "/",
+        response_class=HTMLResponse,
+        tags=["PWA"],
+        summary="SchemeSaathi PWA Shell",
+    )
+    @app.get(
+        "/app",
+        response_class=HTMLResponse,
+        tags=["PWA"],
+        summary="SchemeSaathi PWA Application View",
+    )
+    async def get_pwa_shell() -> HTMLResponse:
+        """Serve installable offline-capable PWA client."""
+        template_path = Path(__file__).parent / "templates" / "pwa.html"
+        if template_path.is_file():
+            return HTMLResponse(content=template_path.read_text(encoding="utf-8"))
+        return HTMLResponse(content="<h1>PWA template not found</h1>", status_code=404)
+
+    @app.get("/manifest.json", tags=["PWA"], summary="PWA Web App Manifest")
+    async def get_manifest() -> Response:
+        """Serve PWA manifest with standard manifest MIME type."""
+        manifest_path = Path(__file__).parent / "static" / "manifest.json"
+        if manifest_path.is_file():
+            return Response(
+                content=manifest_path.read_text(encoding="utf-8"),
+                media_type="application/manifest+json",
+            )
+        return Response(content="{}", media_type="application/manifest+json", status_code=404)
+
+    @app.get("/sw.js", tags=["PWA"], summary="PWA Service Worker")
+    async def get_service_worker() -> Response:
+        """Serve service worker with root scope permissions."""
+        sw_path = Path(__file__).parent / "static" / "sw.js"
+        if sw_path.is_file():
+            return Response(
+                content=sw_path.read_text(encoding="utf-8"),
+                media_type="application/javascript",
+                headers={"Service-Worker-Allowed": "/"},
+            )
+        return Response(
+            content="// sw not found", media_type="application/javascript", status_code=404
+        )
+
+    # 7. Register Thin Demo Webpage
     @app.get(
         "/demo",
         response_class=HTMLResponse,
@@ -113,7 +164,7 @@ def create_app() -> FastAPI:
             return HTMLResponse(content=template_path.read_text(encoding="utf-8"))
         return HTMLResponse(content="<h1>Demo template not found</h1>", status_code=404)
 
-    # 6. Register Thin Chat Demo Webpage
+    # 8. Register Thin Chat Demo Webpage
     @app.get(
         "/chat",
         response_class=HTMLResponse,

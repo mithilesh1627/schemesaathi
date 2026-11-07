@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="36" fill="#2563eb"/>
+  <path d="M96 44 L148 70 L96 96 L44 70 Z" fill="#ffffff"/>
+  <path d="M60 84 L60 114 C60 128 132 128 132 114 L132 84 L96 102 Z" fill="#ffffff" opacity="0.95"/>
+  <line x1="148" y1="70" x2="148" y2="120" stroke="#fbbf24" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="148" cy="124" r="5" fill="#fbbf24"/>
+  <text x="96" y="160" font-family="-apple-system, sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="middle">SchemeSaathi</text>
+</svg>

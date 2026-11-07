@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="description" content="SchemeSaathi — Intelligent Grounded Indian Government Scholarship Discovery Platform">
+  <title>SchemeSaathi — Scholarship Discovery</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/static/icons/icon-192.svg">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="top-bar">
+        <div class="brand">
+          <img src="/static/icons/icon-192.svg" alt="SchemeSaathi Logo" class="brand-icon">
+          <div>
+            <h1 data-i18n="appName">SchemeSaathi</h1>
+            <p style="font-size: 0.8rem; color: var(--muted);" data-i18n="appSubtitle">Indian Scholarship Discovery</p>
+          </div>
+        </div>
+        <button id="lang-toggle" class="lang-btn" aria-label="Toggle language">
+          MNI (Meiteilon)
+        </button>
+      </div>
+
+      <div class="pilot-banner" data-i18n="pilotBanner" role="alert">
+        Demo — Manipur Pilot. Prototype build, not a public launch.
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tab-bar" role="tablist" aria-label="SchemeSaathi Views">
+      <button class="tab-btn active" role="tab" id="tab-eligibility" data-tab="view-eligibility" aria-selected="true" aria-controls="view-eligibility" data-i18n="tabEligibility">
+        Check Eligibility
+      </button>
+      <button class="tab-btn" role="tab" id="tab-chat" data-tab="view-chat" aria-selected="false" aria-controls="view-chat" data-i18n="tabChat">
+        Ask SchemeSaathi
+      </button>
+      <button class="tab-btn" role="tab" id="tab-checklist" data-tab="view-checklist" aria-selected="false" aria-controls="view-checklist" data-i18n="tabChecklist">
+        My Documents
+      </button>
+    </nav>
+
+    <!-- View 1: Eligibility Evaluation -->
+    <main>
+      <section id="view-eligibility" class="view-pane" role="tabpanel" aria-labelledby="tab-eligibility">
+        <div class="card">
+          <h2 class="card-title" data-i18n="eligibilityTitle">Check Statutory Eligibility</h2>
+          <p class="card-desc" data-i18n="eligibilityDesc">
+            Deterministic evaluation against official government guidelines. All 6 pilot schemes are AY 2024–2025 with closed windows.
+          </p>
+
+          <form id="eligibility-form">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="domicile_state" data-i18n="lblDomicile">Domicile State</label>
+                <input type="text" id="domicile_state" name="domicile_state" value="MANIPUR" required>
+              </div>
+
+              <div class="form-group">
+                <label for="social_category" data-i18n="lblCategory">Social Category</label>
+                <select id="social_category" name="social_category">
+                  <option value="ST" selected>ST (Scheduled Tribe)</option>
+                  <option value="SC">SC (Scheduled Caste)</option>
+                  <option value="OBC">OBC (Other Backward Classes)</option>
+                  <option value="GENERAL">General / Unreserved</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="annual_family_income_inr" data-i18n="lblIncome">Annual Family Income (₹)</label>
+                <input type="number" id="annual_family_income_inr" name="annual_family_income_inr" value="200000" min="0" step="1000" required>
+              </div>
+
+              <div class="form-group">
+                <label for="course_level" data-i18n="lblCourse">Course Level</label>
+                <select id="course_level" name="course_level">
+                  <option value="UNDERGRADUATE" selected>Undergraduate (Degree)</option>
+                  <option value="POSTGRADUATE">Postgraduate (PG)</option>
+                  <option value="CLASS_9_10">Class 9 or 10 (Pre-Matric)</option>
+                  <option value="DIPLOMA">Diploma / Polytechnic</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="marks_percent" data-i18n="lblMarks">Qualifying Marks (%)</label>
+                <input type="number" id="marks_percent" name="marks_percent" value="65.0" min="0" max="100" step="0.1" required>
+              </div>
+
+              <div class="form-group">
+                <label for="gender" data-i18n="lblGender">Gender</label>
+                <select id="gender" name="gender">
+                  <option value="ANY" selected>Any / All</option>
+                  <option value="FEMALE">Female</option>
+                  <option value="MALE">Male</option>
+                  <option value="OTHER">Other / Transgender</option>
+                </select>
+              </div>
+
+              <div class="checkbox-group">
+                <input type="checkbox" id="is_displaced" name="is_displaced">
+                <label for="is_displaced" data-i18n="lblDisplaced">
+                  Displaced / Conflict-Affected Student (Manipur)
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" id="eval-submit-btn" class="btn-primary" style="margin-top: 1rem;" data-i18n="btnEvaluate">
+              Evaluate Statutory Eligibility
+            </button>
+          </form>
+        </div>
+
+        <div id="eval-results-area" style="display: none;">
+          <div class="metrics-bar">
+            <span>Evaluated in <strong id="eval-time-ms">0</strong> ms</span>
+            <span id="eval-counts-summary">0 Eligible &bull; 0 Not Eligible &bull; 0 Unknown</span>
+          </div>
+          <div class="results-list" id="eval-results-list"></div>
+        </div>
+      </section>
+
+      <!-- View 2: Grounded Chat -->
+      <section id="view-chat" class="view-pane" role="tabpanel" aria-labelledby="tab-chat" style="display: none;" hidden>
+        <div class="card chat-window">
+          <div class="card-header" style="margin-bottom: 0.6rem;">
+            <h2 class="card-title" data-i18n="chatTitle">Grounded Conversational Assistant</h2>
+            <p class="card-desc" data-i18n="chatDesc">
+              Answers grounded strictly in official guideline chunks. Eligibility evaluated only by the deterministic engine.
+            </p>
+          </div>
+
+          <div id="chat-messages" class="chat-messages" role="log" aria-live="polite">
+            <div class="chat-bubble assistant" data-i18n="chatWelcome">
+              Hello! I am SchemeSaathi. Ask me about scholarship eligibility rules, benefits, or document requirements for Manipur pilot schemes.
+            </div>
+          </div>
+
+          <div id="chat-error-banner" class="error-banner" style="display: none;" role="alert">
+            <span id="chat-error-text">Service unreachable.</span>
+            <button id="chat-retry-btn" type="button" data-i18n="btnRetry">Retry</button>
+          </div>
+
+          <form id="chat-form" class="chat-input-row" style="margin-top: auto;">
+            <input type="text" id="chat-input" placeholder="Ask about scholarship rules, benefits, deadlines..." data-i18n-placeholder="chatPlaceholder" required autocomplete="off">
+            <button type="submit" id="chat-send-btn" class="btn-primary" data-i18n="btnSend">
+              Send
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <!-- View 3: Offline Document Checklist -->
+      <section id="view-checklist" class="view-pane" role="tabpanel" aria-labelledby="tab-checklist" style="display: none;" hidden>
+        <div class="card">
+          <h2 class="card-title" data-i18n="checklistTitle">Document Readiness Checklist</h2>
+          <p class="card-desc" data-i18n="checklistDesc">
+            Manage required documents per scheme offline. Marks persist on this device and are never uploaded.
+          </p>
+
+          <div class="checklist-select-row">
+            <label for="checklist-scheme-select" style="margin-bottom: 0.35rem; display: block;" data-i18n="lblSelectScheme">
+              Select Scholarship Scheme
+            </label>
+            <select id="checklist-scheme-select" style="width: 100%;"></select>
+          </div>
+
+          <div id="checklist-counter" class="summary-counter">
+            0 Have &bull; 0 Missing &bull; 0 Unknown
+          </div>
+
+          <div id="checklist-container" class="checklist-items"></div>
+
+          <!-- Statutory Warning Boxes -->
+          <div class="warning-box npci" role="note">
+            <strong data-i18n="npciTitle">Mandatory NPCI APB Mapping Requirement</strong>
+            <p data-i18n="npciWarning">
+              Standard bank account KYC is insufficient. Your Aadhaar number must be actively linked to your bank account and mapped on the NPCI Aadhaar Payment Bridge (APB) mapper for PFMS DBT scholarship disbursement.
+            </p>
+          </div>
+
+          <div class="warning-box otr" role="note">
+            <strong data-i18n="otrTitle">NSP One-Time Registration (OTR) Face RD</strong>
+            <p data-i18n="otrWarning">
+              National Scholarship Portal 2.0 requires One-Time Registration with Aadhaar Face RD biometric verification prior to application submission.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer & Local Data Actions -->
+    <footer>
+      <div>
+        <button type="button" id="clear-data-btn" class="btn-secondary" data-i18n="btnClearData">
+          Clear My Data
+        </button>
+      </div>
+      <div>
+        <span>SchemeSaathi PWA &bull; Offline Ready &bull; Zero Aadhaar Storage</span>
+      </div>
+    </footer>
+  </div>
+
+  <div id="app-toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
