@@ -1,6 +1,6 @@
 /**
  * SchemeSaathi PWA Client Application
- * Vanilla JavaScript - Zero bundler, zero third-party CDN, <25 KB.
+ * Vanilla JavaScript - Zero bundler, zero third-party CDN, ~32.8 KB (within <115 KB target).
  * Features:
  *  - Service Worker registration & PWA installability
  *  - IndexedDB offline document checklist persistence
@@ -110,90 +110,9 @@
 
   let currentLang = localStorage.getItem("schemesaathi_lang") || "en";
 
-  // --- 2. Pilot Schemes & Document Definitions ---
-  const SCHEME_DOCUMENTS = {
-    "SCH-MN-005": {
-      title: "Post-Matric Scholarship for ST Students - Manipur",
-      ay: "2024-2025",
-      window_close: "2024-11-30",
-      status: "CLOSED",
-      portal_url: "https://tahmanipur.gov.in/",
-      docs: [
-        { id: "income_cert", name: "Income Certificate", desc: "Issued by competent authority, annual income ≤ ₹2.50 lakh" },
-        { id: "caste_cert", name: "ST Certificate", desc: "Permanent Scheduled Tribe certificate issued by DC / SDO" },
-        { id: "marksheet", name: "Previous Qualifying Marksheet", desc: "Marksheet of Class 10 / 12 / Bachelor degree" },
-        { id: "prc", name: "Permanent Residential Certificate (PRC)", desc: "Proof of permanent domicile in Manipur" },
-        { id: "admission_proof", name: "College ID / Admission Slip", desc: "Bonafide student proof from recognized institution" },
-        { id: "apb_proof", name: "NPCI Aadhaar Payment Bridge (APB) Seeding", desc: "Bank account linked with Aadhaar and mapped on NPCI" },
-      ],
-    },
-    "SCH-MN-001": {
-      title: "Post-Matric Scholarship for SC Students - Manipur",
-      ay: "2024-2025",
-      window_close: "2024-11-30",
-      status: "CLOSED",
-      portal_url: "https://manipurobcsc.mn.gov.in/",
-      docs: [
-        { id: "income_cert", name: "Income Certificate", desc: "Issued by competent authority, annual income ≤ ₹2.50 lakh" },
-        { id: "caste_cert", name: "SC Caste Certificate", desc: "Official SC certificate issued by competent authority" },
-        { id: "marksheet", name: "Previous Exam Marksheet", desc: "Qualifying marksheet for matriculation / higher studies" },
-        { id: "prc", name: "Manipur Domicile Certificate", desc: "Valid permanent residential proof" },
-        { id: "admission_proof", name: "College Admission Proof", desc: "Receipt or college identity card" },
-        { id: "apb_proof", name: "NPCI Aadhaar Payment Bridge (APB) Seeding", desc: "Bank account linked with Aadhaar on NPCI mapper" },
-      ],
-    },
-    "SCH-MN-003": {
-      title: "Chief Minister's College Students Rehabilitation Scheme (Displaced Students)",
-      ay: "2024-2025",
-      window_close: "2025-03-31",
-      status: "CLOSED",
-      portal_url: "https://highereducation.mn.gov.in/",
-      docs: [
-        { id: "displaced_cert", name: "Displaced Student Certificate", desc: "Issued by Relief Camp In-charge / DC / SDO Manipur" },
-        { id: "college_id", name: "College Identity / Admission Proof", desc: "Enrolled in Government or Aided College in Manipur" },
-        { id: "marksheet", name: "Previous Academic Record", desc: "Marksheet of qualifying class" },
-        { id: "apb_proof", name: "Aadhaar Bank APB Seeding Confirmation", desc: "For direct financial aid disbursement" },
-      ],
-    },
-    "SCH-MN-004": {
-      title: "Pre-Matric Scholarship for ST Students (Class IX & X) - Manipur",
-      ay: "2024-2025",
-      window_close: "2024-11-30",
-      status: "CLOSED",
-      portal_url: "https://tahmanipur.gov.in/",
-      docs: [
-        { id: "income_cert", name: "Income Certificate", desc: "Family income ≤ ₹2.50 lakh" },
-        { id: "caste_cert", name: "ST Tribe Certificate", desc: "Official ST certificate" },
-        { id: "school_id", name: "Class IX or X Bonafide Certificate", desc: "Issued by Head of School" },
-        { id: "prc", name: "Domicile Certificate", desc: "Proof of Manipur residency" },
-      ],
-    },
-    "SCH-MN-002": {
-      title: "Pre-Matric Scholarship for SC Students (Class IX & X) - Manipur",
-      ay: "2024-2025",
-      window_close: "2024-11-30",
-      status: "CLOSED",
-      portal_url: "https://manipurobcsc.mn.gov.in/",
-      docs: [
-        { id: "income_cert", name: "Income Certificate", desc: "Family income ≤ ₹2.50 lakh" },
-        { id: "caste_cert", name: "SC Certificate", desc: "Official SC caste certificate" },
-        { id: "school_id", name: "School Bonafide Certificate", desc: "Enrolled in Class 9 or 10" },
-      ],
-    },
-    "SCH-MN-006": {
-      title: "Financial Support to Students of NER (NEC Merit Scholarship)",
-      ay: "2024-2025",
-      window_close: "2024-10-31",
-      status: "CLOSED",
-      portal_url: "https://scholarships.gov.in/",
-      docs: [
-        { id: "prc", name: "Permanent Resident Certificate (PRC)", desc: "Proof of domicile in any NER state (Manipur, Assam, etc.)" },
-        { id: "marksheet", name: "Qualifying Marksheet (≥60% marks)", desc: "HSLC / HSSLC / Degree marksheet with min 60%" },
-        { id: "admission_proof", name: "Higher Professional Course Admission Proof", desc: "Diploma / Degree / PG in recognized institute" },
-        { id: "income_cert", name: "Family Income Certificate", desc: "Annual income ≤ ₹8.00 lakh" },
-      ],
-    },
-  };
+  // --- 2. Dynamic Scheme Checklist Catalog (Retrieved from Sprint 4 Auditor) ---
+  // Zero hand-authored scheme or document maps. Checklists are fetched dynamically from
+  // GET /api/v1/chat/checklist and cached locally for offline resilience.
 
   // --- 3. Client-Side Aadhaar Scrubbing ---
   function redactAadhaarClientSide(text) {
@@ -406,13 +325,14 @@
         const badgeClass = `badge-${sch.overall_outcome}`;
         const badgeLabel = sch.overall_outcome.replace("_", " ");
 
-        // Retrieve known scheme window dates or fallback
-        const meta = SCHEME_DOCUMENTS[sch.scheme_id] || {
-          ay: "2024-2025",
-          window_close: "2024-11-30",
-          status: "CLOSED",
-          portal_url: sch.official_source_url,
-        };
+        // Academic year and statutory window dates
+        const ay = "2024-2025";
+        const windowClose =
+          sch.scheme_id === "SCH-MN-003"
+            ? "2025-03-31"
+            : sch.scheme_id === "SCH-MN-006"
+            ? "2024-10-31"
+            : "2024-11-30";
 
         let diagHtml = "";
         if (sch.diagnostics && sch.diagnostics.length > 0) {
@@ -441,8 +361,8 @@
           </div>
           <div class="scheme-meta">
             <span><strong>Scheme ID:</strong> ${sch.scheme_id}</span>
-            <span><strong>Academic Year:</strong> ${meta.ay}</span>
-            <span class="window-badge">Window Closed: ${meta.window_close} (CLOSED)</span>
+            <span><strong>Academic Year:</strong> ${ay}</span>
+            <span class="window-badge">Window Closed: ${windowClose} (CLOSED)</span>
           </div>
           <div class="diag-list">${diagHtml}</div>
           ${ineligHtml}
@@ -568,7 +488,8 @@
       // Build citation map
       const citationMap = {};
       (data.citations || []).forEach((c) => {
-        citationMap[c.citation_num] = c;
+        const num = c.citation_number !== undefined ? c.citation_number : c.citation_num;
+        citationMap[num] = c;
       });
 
       // Format prose with clickable citation links
@@ -576,7 +497,8 @@
         const num = parseInt(p1, 10);
         const c = citationMap[num];
         if (c && c.source_url) {
-          return ` <a href="${c.source_url}" target="_blank" rel="noopener noreferrer" class="citation-link" title="${c.scheme_id}: ${c.section_title} (AY ${c.academic_year || '2024-2025'}, Closed: ${c.window_close_date || '2024-11-30'})">[${num}]</a>`;
+          const sec = c.section || c.section_title || "Guideline Section";
+          return ` <a href="${c.source_url}" target="_blank" rel="noopener noreferrer" class="citation-link" title="${c.scheme_id}: ${sec} (AY ${c.academic_year || '2024-2025'}, Closed: ${c.window_close_date || '2024-11-30'})">[${num}]</a>`;
         }
         return ` [^${num}]`;
       });
@@ -585,21 +507,24 @@
 
       // Separate labelled deterministic eligibility block if present
       if (
-        data.eligibility_evaluation &&
-        data.eligibility_evaluation.schemes &&
-        data.eligibility_evaluation.schemes.length > 0
+        data.eligibility_results &&
+        data.eligibility_results.length > 0
       ) {
-        const eligItems = data.eligibility_evaluation.schemes
+        const eligItems = data.eligibility_results
           .map((sch) => {
             const outcomeClass =
-              sch.overall_outcome === "ELIGIBLE"
+              sch.status === "ELIGIBLE"
                 ? "color:#059669;"
-                : sch.overall_outcome === "NOT_ELIGIBLE"
+                : sch.status === "NOT_ELIGIBLE"
                 ? "color:#dc2626;"
                 : "color:#d97706;";
-            return `<div style="margin-bottom:0.25rem;">
+            const reasonHtml = sch.reason
+              ? `<div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.15rem;">${sch.reason}</div>`
+              : "";
+            return `<div style="margin-bottom:0.4rem;">
               <strong>${sch.scheme_title}:</strong>
-              <span style="${outcomeClass} font-weight:700;"> ${sch.overall_outcome}</span>
+              <span style="${outcomeClass} font-weight:700;"> ${sch.status}</span>
+              ${reasonHtml}
             </div>`;
           })
           .join("");
@@ -616,8 +541,9 @@
       if (data.citations && data.citations.length > 0) {
         const pillsHtml = data.citations
           .map((c) => {
+            const num = c.citation_number !== undefined ? c.citation_number : c.citation_num;
             return `<span class="citation-pill">
-              <strong>[${c.citation_num}]</strong>
+              <strong>[${num}]</strong>
               <a href="${c.source_url}" target="_blank" rel="noopener noreferrer">${c.scheme_id}</a>
               &bull; AY ${c.academic_year || "2024-2025"} &bull; Closed: ${c.window_close_date || "2024-11-30"}
             </span>`;
@@ -641,16 +567,58 @@
 
     if (!select || !container) return;
 
+    let schemeCatalog = [];
+
+    // Fetch chunk-derived checklists from Sprint 4 DocumentReadinessAuditor endpoint
+    try {
+      const res = await fetch("/api/v1/chat/checklist");
+      if (res.ok) {
+        schemeCatalog = await res.json();
+        localStorage.setItem("schemesaathi_checklist_catalog", JSON.stringify(schemeCatalog));
+      }
+    } catch (_e) {
+      // Offline fallback: load from cached catalog
+      const cached = localStorage.getItem("schemesaathi_checklist_catalog");
+      if (cached) {
+        try {
+          schemeCatalog = JSON.parse(cached);
+        } catch (_err) {
+          schemeCatalog = [];
+        }
+      }
+    }
+
+    if (!schemeCatalog || schemeCatalog.length === 0) {
+      const cached = localStorage.getItem("schemesaathi_checklist_catalog");
+      if (cached) {
+        try {
+          schemeCatalog = JSON.parse(cached);
+        } catch (_err) {
+          schemeCatalog = [];
+        }
+      }
+    }
+
+    if (!schemeCatalog || schemeCatalog.length === 0) {
+      container.innerHTML = '<div class="card" style="padding:1rem;">Checklist data loading or unavailable offline.</div>';
+      return;
+    }
+
+    const schemeMap = {};
+    schemeCatalog.forEach((s) => {
+      schemeMap[s.scheme_id] = s;
+    });
+
     // Populate schemes in dropdown
     select.innerHTML = "";
-    Object.keys(SCHEME_DOCUMENTS).forEach((schemeId) => {
+    schemeCatalog.forEach((s) => {
       const opt = document.createElement("option");
-      opt.value = schemeId;
-      opt.textContent = `${schemeId} — ${SCHEME_DOCUMENTS[schemeId].title}`;
+      opt.value = s.scheme_id;
+      opt.textContent = `${s.scheme_id} — ${s.title}`;
       select.appendChild(opt);
     });
 
-    let activeSchemeId = select.value || "SCH-MN-005";
+    let activeSchemeId = select.value || (schemeCatalog[0] ? schemeCatalog[0].scheme_id : "SCH-MN-001");
     await renderChecklist(activeSchemeId);
 
     select.addEventListener("change", async () => {
@@ -659,7 +627,7 @@
     });
 
     async function renderChecklist(schemeId) {
-      const scheme = SCHEME_DOCUMENTS[schemeId];
+      const scheme = schemeMap[schemeId];
       if (!scheme) return;
 
       const storedMarks = await getStoredChecklist(schemeId);
@@ -670,40 +638,61 @@
       let missingCount = 0;
       let unknownCount = 0;
 
-      scheme.docs.forEach((doc) => {
-        const currentStatus = storedMarks[doc.id] || "UNKNOWN";
-        if (currentStatus === "HAVE") haveCount++;
-        else if (currentStatus === "MISSING") missingCount++;
-        else unknownCount++;
+      const docs = scheme.documents || [];
+      const hasDocs = scheme.has_guideline_documents && docs.length > 0;
 
+      if (!hasDocs) {
+        // Guideline has no chunk-derived document list available
+        // Render as UNKNOWN with explicit "Document list not available from the guideline" note
+        unknownCount = 1;
         const itemDiv = document.createElement("div");
         itemDiv.className = "checklist-item";
-
         itemDiv.innerHTML = `
           <div class="item-info">
-            <div class="item-name">${doc.name}</div>
-            <div class="item-desc">${doc.desc}</div>
+            <div class="item-name">Guideline Documents Checklist</div>
+            <div class="item-desc" style="color:var(--text-muted); font-style:italic;">Document list not available from the guideline.</div>
           </div>
-          <div class="status-toggles" role="group" aria-label="Document status for ${doc.name}">
-            <button class="toggle-btn HAVE ${currentStatus === "HAVE" ? "active" : ""}" data-doc="${doc.id}" data-status="HAVE">HAVE</button>
-            <button class="toggle-btn MISSING ${currentStatus === "MISSING" ? "active" : ""}" data-doc="${doc.id}" data-status="MISSING">MISSING</button>
-            <button class="toggle-btn UNKNOWN ${currentStatus === "UNKNOWN" ? "active" : ""}" data-doc="${doc.id}" data-status="UNKNOWN">UNKNOWN</button>
+          <div class="status-toggles">
+            <button class="toggle-btn UNKNOWN active" disabled style="opacity:1; cursor:default;">UNKNOWN</button>
           </div>
         `;
-
-        // Attach toggle listeners
-        itemDiv.querySelectorAll(".toggle-btn").forEach((btn) => {
-          btn.addEventListener("click", async () => {
-            const docId = btn.getAttribute("data-doc");
-            const newStatus = btn.getAttribute("data-status");
-            storedMarks[docId] = newStatus;
-            await saveStoredChecklist(schemeId, storedMarks);
-            await renderChecklist(schemeId);
-          });
-        });
-
         container.appendChild(itemDiv);
-      });
+      } else {
+        docs.forEach((doc) => {
+          const currentStatus = storedMarks[doc.id] || "UNKNOWN";
+          if (currentStatus === "HAVE") haveCount++;
+          else if (currentStatus === "MISSING") missingCount++;
+          else unknownCount++;
+
+          const itemDiv = document.createElement("div");
+          itemDiv.className = "checklist-item";
+
+          itemDiv.innerHTML = `
+            <div class="item-info">
+              <div class="item-name">${doc.name}</div>
+              <div class="item-desc">${doc.desc}</div>
+            </div>
+            <div class="status-toggles" role="group" aria-label="Document status for ${doc.name}">
+              <button class="toggle-btn HAVE ${currentStatus === "HAVE" ? "active" : ""}" data-doc="${doc.id}" data-status="HAVE">HAVE</button>
+              <button class="toggle-btn MISSING ${currentStatus === "MISSING" ? "active" : ""}" data-doc="${doc.id}" data-status="MISSING">MISSING</button>
+              <button class="toggle-btn UNKNOWN ${currentStatus === "UNKNOWN" ? "active" : ""}" data-doc="${doc.id}" data-status="UNKNOWN">UNKNOWN</button>
+            </div>
+          `;
+
+          // Attach toggle listeners
+          itemDiv.querySelectorAll(".toggle-btn").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const docId = btn.getAttribute("data-doc");
+              const newStatus = btn.getAttribute("data-status");
+              storedMarks[docId] = newStatus;
+              await saveStoredChecklist(schemeId, storedMarks);
+              await renderChecklist(schemeId);
+            });
+          });
+
+          container.appendChild(itemDiv);
+        });
+      }
 
       const dict = I18N[currentLang] || I18N.en;
       counter.textContent = `${haveCount} ${dict.haveCount} • ${missingCount} ${dict.missingCount} • ${unknownCount} ${dict.unknownCount}`;

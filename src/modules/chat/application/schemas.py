@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
 from src.core.security import redact_pii_text
+from src.modules.chat.application.auditor import NPCI_APB_WARNING, OTR_FACE_RD_WARNING
 
 
 class ChatMessageRequest(BaseModel):
@@ -92,3 +93,39 @@ class ChatMessageResponse(BaseModel):
     eligibility_results: list[EligibilityItemResult] | None = None
     document_audit: DocumentAuditResult | None = None
     is_refusal: bool = False
+
+
+class SchemeChecklistDocumentItem(BaseModel):
+    """Checklist item for an individual required document derived from guideline chunks."""
+
+    id: str = Field(..., description="Stable identifier / slug for the document.")
+    name: str = Field(..., description="Standardized document name.")
+    desc: str = Field(..., description="Guidance or extraction source description.")
+    status: str = Field(default="UNKNOWN", description="Default status (HAVE, MISSING, UNKNOWN).")
+    is_available: bool = Field(
+        default=True, description="Whether statutory document list is available from guideline."
+    )
+
+
+class SchemeChecklistResponse(BaseModel):
+    """Checklist schema for a scheme exposing DocumentReadinessAuditor derived requirements."""
+
+    scheme_id: str = Field(..., description="Canonical scheme identifier.")
+    title: str = Field(..., description="Official scheme title in English.")
+    academic_year: str = Field(default="2024-2025", description="Academic year.")
+    window_close_date: str | None = Field(None, description="Application window close date.")
+    portal_status: str = Field(default="CLOSED", description="Application portal window status.")
+    portal_url: str = Field(..., description="Official government application portal URL.")
+    documents: list[SchemeChecklistDocumentItem] = Field(default_factory=list)
+    has_guideline_documents: bool = Field(
+        default=True, description="Whether guideline chunks provide a statutory document list."
+    )
+    guidance_note: str | None = Field(
+        None, description="Notice if document list is not available in guideline."
+    )
+    npci_apb_warning: str = Field(
+        default=NPCI_APB_WARNING, description="Mandatory NPCI APB warning."
+    )
+    otr_face_rd_warning: str = Field(
+        default=OTR_FACE_RD_WARNING, description="Mandatory NSP OTR / Face RD warning."
+    )

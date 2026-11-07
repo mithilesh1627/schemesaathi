@@ -131,6 +131,11 @@ async def test_pwa_offline_checklist_and_service_worker_spec(
     assert "saveStoredChecklist" in js_code
     assert "clearAllIndexedDb" in js_code
     assert "clear-data-btn" in js_code
+    # F4 regression assert: ensure no hardcoded SCHEME_DOCUMENTS and checklist calls auditor endpoint
+    assert "SCHEME_DOCUMENTS" not in js_code, (
+        "app.js must not contain hardcoded SCHEME_DOCUMENTS map"
+    )
+    assert "/api/v1/chat/checklist" in js_code, "app.js checklist flow must query auditor endpoint"
 
     # Verify Statutory Warning content in HTML
     res_html = await async_client.get("/")
@@ -310,3 +315,117 @@ async def test_pwa_pan_india_guardrail(async_client: AsyncClient) -> None:
     assert resp.status_code == 200
     data = resp.json()
     assert "schemes" in data
+
+
+@pytest.mark.asyncio
+async def test_checklist_scheme_identities_and_auditor_endpoint(
+    async_client: AsyncClient,
+) -> None:
+    """F4 Regression: Assert exactly 6 real schemes with authentic titles, and no invented schemes."""
+    # 1. Fetch checklist catalog from auditor endpoint
+    res = await async_client.get("/api/v1/chat/checklist")
+    assert res.status_code == 200
+    schemes = res.json()
+
+    # Assert exactly 6 schemes returned
+    assert len(schemes) == 6, f"Expected exactly 6 schemes, found {len(schemes)}"
+
+    scheme_ids = [s["scheme_id"] for s in schemes]
+    expected_ids = [
+        "SCH-MN-001",
+        "SCH-MN-003",
+        "SCH-MN-005",
+        "SCH-MN-006",
+        "SCH-MN-007",
+        "SCH-MN-009",
+    ]
+    assert sorted(scheme_ids) == expected_ids
+
+    # Assert invented schemes SCH-MN-002 and SCH-MN-004 are strictly absent
+    assert "SCH-MN-002" not in scheme_ids, "Invented scheme SCH-MN-002 must not exist"
+    assert "SCH-MN-004" not in scheme_ids, "Invented scheme SCH-MN-004 must not exist"
+
+    # 2. Assert real titles (seed_data.py verified identities)
+    schemes_by_id = {s["scheme_id"]: s for s in schemes}
+    assert schemes_by_id["SCH-MN-001"]["title"] == "State Merit Scholarship Manipur"
+    assert "Chief Minister" in schemes_by_id["SCH-MN-003"]["title"]
+    assert (
+        schemes_by_id["SCH-MN-005"]["title"] == "Post-Matric Scholarship for ST Students - Manipur"
+    )
+    assert (
+        schemes_by_id["SCH-MN-006"]["title"]
+        == "Pre-Matric Scholarship for ST Students (Classes IX & X) - Manipur"
+    )
+    assert (
+        schemes_by_id["SCH-MN-007"]["title"] == "Post-Matric Scholarship for OBC Students - Manipur"
+    )
+    assert (
+        schemes_by_id["SCH-MN-009"]["title"] == "Post-Matric Scholarship for SC Students - Manipur"
+    )
+
+    # 3. Assert schemes without chunk-derived document requirements render as UNKNOWN with explicit note
+    for unavailable_id in ["SCH-MN-003", "SCH-MN-005"]:
+        item = schemes_by_id[unavailable_id]
+        assert item["has_guideline_documents"] is False
+        assert "Document list not available from the guideline" in (item["guidance_note"] or "")
+        assert len(item["documents"]) >= 1
+        assert item["documents"][0]["status"] == "UNKNOWN"
+
+    # 4. Assert individual scheme checklist endpoint
+    res_single = await async_client.get("/api/v1/chat/checklist/SCH-MN-001")
+    assert res_single.status_code == 200
+    assert res_single.json()["title"] == "State Merit Scholarship Manipur"
+
+    res_404 = await async_client.get("/api/v1/chat/checklist/SCH-MN-002")
+    assert res_404.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_chat_separate_eligibility_block_renders_from_api_response(
+    async_client: AsyncClient,
+) -> None:
+    """F4 Regression: Assert app.js reads eligibility_results and status to render separate block."""
+    # 1. Assert client code uses eligibility_results and status, not buggy fields
+    res_js = await async_client.get("/static/app.js")
+    assert res_js.status_code == 200
+    js_text = res_js.text
+
+    assert "eligibility_results" in js_text, "app.js must read data.eligibility_results"
+    assert "sch.status" in js_text, "app.js must read sch.status"
+    assert "data.eligibility_evaluation" not in js_text, (
+        "Buggy check data.eligibility_evaluation must be removed from app.js"
+    )
+    assert "eligibility_evaluation.schemes" not in js_text, (
+        "Buggy field data.eligibility_evaluation.schemes must be removed from app.js"
+    )
+    assert "eligibility-box" in js_text, "app.js must render <div class='eligibility-box'>"
+
+    # 2. Verify backend ChatMessageResponse returns eligibility_results with status
+    chat_payload = {
+        "session_id": "test-chat-elig-separate-box",
+        "message": "Am I eligible for Post-Matric ST scholarship?",
+        "profile_updates": {
+            "domicile_state": "MANIPUR",
+            "social_category": "ST",
+            "annual_family_income_inr": 200000.0,
+            "marks_percent": 65.0,
+            "course_level": "UNDERGRADUATE",
+            "is_displaced": False,
+        },
+    }
+    resp = await async_client.post("/api/v1/chat/message", json=chat_payload)
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert "eligibility_results" in data
+    assert data["eligibility_results"] is not None
+    assert len(data["eligibility_results"]) > 0
+
+    results_map = {r["scheme_id"]: r for r in data["eligibility_results"]}
+    assert "SCH-MN-005" in results_map
+    assert results_map["SCH-MN-005"]["status"] == "ELIGIBLE"
+    assert (
+        results_map["SCH-MN-005"]["scheme_title"]
+        == "Post-Matric Scholarship for ST Students - Manipur"
+    )
+    assert "reason" in results_map["SCH-MN-005"]
