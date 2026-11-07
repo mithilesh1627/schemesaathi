@@ -5,8 +5,9 @@
 **Date:** 2026-11-07  
 **Repository:** `mithilesh1627/schemesaathi`  
 **Baseline Head:** `23805bc` (Initial Sprint 5 Submission)  
+**Verified Remediation Head:** `50f5034` (Green CI Run `42387407327`)  
 **Baseline Observed Test Count:** 184 passed, 8 skipped locally (192 collected; 192 passed in CI Run `42380303760`)  
-**Sprint 5 Remediation Verified Test Count:** 186 passed, 8 skipped locally (194 collected; 194 in CI with PostgreSQL 16 + pgvector and Redis)  
+**Sprint 5 Remediation Verified Test Count:** 186 passed, 8 skipped locally (194 collected; 194 passed in CI Run `42387407327` with PostgreSQL 16 + pgvector and Redis)  
 
 ---
 
@@ -431,6 +432,12 @@ tests\integration\test_pwa.py::test_chat_separate_eligibility_block_renders_from
   .venv\Scripts\mypy.exe src tests
   Success: no issues found in 91 source files
   ```
+- **GitHub Actions Verified Green Run:**
+  - Run URL: [`https://github.com/mithilesh1627/schemesaathi/actions/runs/42387407327`](https://github.com/mithilesh1627/schemesaathi/actions/runs/42387407327)
+  - Target Commit: `50f5034` on `main`
+  - Jobs:
+    - `Code Quality (Ruff & Mypy)`: **SUCCESS**
+    - `Automated Unit & Integration Tests`: **SUCCESS** (194 tests passed)
 
 ---
 
