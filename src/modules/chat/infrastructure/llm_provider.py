@@ -50,13 +50,14 @@ class LocalGroundedLlmProvider(BaseLlmProvider):
 
     def generate(
         self,
-        _prompt: str,
+        prompt: str,
         retrieved_chunks: list[dict[str, Any]],
         synchronizer_state_str: str,
         user_message: str,
         detected_script: LanguageScript,
     ) -> str:
         """Generate deterministic, citation-backed response grounded in retrieved chunks."""
+        _ = prompt  # preserved for contract and external logging
         msg_lower = user_message.lower()
 
         # 1. Out-of-corpus guard: Out-of-domain concepts or zero supporting chunks retrieved
