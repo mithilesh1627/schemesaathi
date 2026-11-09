@@ -17,7 +17,7 @@ def test_valid_citations_resolve_to_retrieved_chunks() -> None:
             "source_url": "https://scholarships.gov.in/st.pdf",
             "content_sha256": "eb53bc37acc93eccbe811f648e7e741ea05b607db796dc1b759cc8e987256efe",
             "academic_year": "2025-2026",
-            "window_close_date": "2025-11-30",
+            "window_close_date": "2025-10-31",
             "portal_status": "CLOSED",
         },
         {
@@ -28,7 +28,7 @@ def test_valid_citations_resolve_to_retrieved_chunks() -> None:
             "source_url": "https://scholarships.gov.in/merit.pdf",
             "content_sha256": "9596807e57debb7b141d18815054363e130a4e7cd454f5bea58598a6ce7ae22c",
             "academic_year": "2025-2026",
-            "window_close_date": "2025-11-30",
+            "window_close_date": "2025-10-31",
             "portal_status": "CLOSED",
         },
     ]

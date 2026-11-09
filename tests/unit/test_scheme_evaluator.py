@@ -24,7 +24,7 @@ from src.modules.catalog.domain.models import (
     SchemeEligibilityRule,
     SchemeVersion,
 )
-from src.modules.eligibility.domain.enums import EvaluationOutcome
+from src.modules.eligibility.domain.enums import EvaluationOutcome, RuleOutcome
 from src.modules.eligibility.domain.models import StudentProfile
 from src.modules.eligibility.domain.scheme_evaluator import evaluate_scheme_for_student
 
@@ -258,6 +258,8 @@ class TestSchemeEvaluatorOutcomes:
         assert res.window_status == "CLOSED"
         assert res.status_label == "Eligible by rules, window closed"
         assert any("window is CLOSED" in d.explanation_en for d in res.diagnostics)
+        win_diag = next(d for d in res.diagnostics if d.clause_name == "Application Window Status")
+        assert win_diag.outcome == RuleOutcome.FAIL
 
     def test_window_status_open_when_today_is_inside_window(self) -> None:
         """Requirement: Window status is OPEN when today is inside statutory window."""
@@ -278,6 +280,8 @@ class TestSchemeEvaluatorOutcomes:
         assert res.window_status == "OPEN"
         assert res.status_label == "Eligible, window open"
         assert any("window is OPEN" in d.explanation_en for d in res.diagnostics)
+        win_diag = next(d for d in res.diagnostics if d.clause_name == "Application Window Status")
+        assert win_diag.outcome == RuleOutcome.PASS
 
     def test_window_status_closed_when_window_dates_are_none(self) -> None:
         """When window dates are missing, window_status safely defaults to CLOSED."""
@@ -295,3 +299,28 @@ class TestSchemeEvaluatorOutcomes:
         assert res.overall_outcome == EvaluationOutcome.ELIGIBLE
         assert res.window_status == "CLOSED"
         assert res.status_label == "Eligible by rules, window closed"
+        win_diag = next(d for d in res.diagnostics if d.clause_name == "Application Window Status")
+        assert win_diag.outcome == RuleOutcome.FAIL
+
+    def test_window_status_open_on_unknown_outcome(self) -> None:
+        """D4 Regression: Unknown outcome with open window derives window_status: OPEN and PASS diagnostic."""
+        today = date.today()
+        scheme = _build_test_scheme(
+            verification_status=VerificationStatus.OFFICIAL_PROVISIONAL,
+            window_open_date=today - timedelta(days=5),
+            window_close_date=today + timedelta(days=20),
+            portal_status=PortalWindowStatus.OPEN,
+        )
+        profile = StudentProfile(
+            domicile_state="MANIPUR",
+            social_category="ST",
+            annual_family_income_inr=150000.0,
+            course_level="UNDERGRADUATE",
+        )
+        res = evaluate_scheme_for_student(scheme, profile)
+        assert res.overall_outcome == EvaluationOutcome.UNKNOWN
+        assert res.window_status == "OPEN"
+        assert res.status_label == "Conditionally eligible / information missing"
+        win_diag = next(d for d in res.diagnostics if d.clause_name == "Application Window Status")
+        assert win_diag.outcome == RuleOutcome.PASS
+        assert "window is OPEN" in win_diag.explanation_en

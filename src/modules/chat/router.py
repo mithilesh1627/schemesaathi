@@ -169,9 +169,7 @@ async def get_all_scheme_checklists(
         latest_version = full_scheme.versions[0] if full_scheme and full_scheme.versions else None
         window = latest_version.application_window if latest_version else None
 
-        close_date = (
-            str(window.window_close_date) if window and window.window_close_date else "2025-11-30"
-        )
+        close_date = str(window.window_close_date) if window and window.window_close_date else None
         ay = latest_version.academic_year if latest_version else "2025-2026"
         p_status = window.portal_status.value if window and window.portal_status else "CLOSED"
         portal_url = (

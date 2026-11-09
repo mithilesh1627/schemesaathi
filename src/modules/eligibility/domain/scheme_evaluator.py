@@ -10,7 +10,7 @@ the strict 3-state deterministic outcome logic:
 from datetime import date
 
 from src.modules.catalog.domain.enums import VerificationStatus
-from src.modules.catalog.domain.models import Scheme, SchemeVersion
+from src.modules.catalog.domain.models import Scheme, SchemeApplicationWindow, SchemeVersion
 from src.modules.eligibility.domain.ast_evaluator import evaluate_ast_node
 from src.modules.eligibility.domain.enums import EvaluationOutcome, RuleOutcome
 from src.modules.eligibility.domain.models import (
@@ -18,6 +18,43 @@ from src.modules.eligibility.domain.models import (
     SchemeEvaluationResult,
     StudentProfile,
 )
+
+
+def _derive_window_info(
+    window: SchemeApplicationWindow | None,
+) -> tuple[str, str | None, str | None, str | None, RuleOutcome, str]:
+    """Derive window_status, portal_type, portal_status, window_close_date, diagnostic outcome, and explanation."""
+    today = date.today()
+    portal_type_val = window.portal_type.value if window and window.portal_type else None
+    portal_status_val = window.portal_status.value if window and window.portal_status else None
+    window_close_val = (
+        str(window.window_close_date) if window and window.window_close_date else None
+    )
+
+    if window and window.window_open_date is not None and window.window_close_date is not None:
+        if window.window_open_date <= today <= window.window_close_date:
+            derived_window_status = "OPEN"
+            w_diag = f"Application window is OPEN (dates: {window.window_open_date} to {window.window_close_date})."
+            w_outcome = RuleOutcome.PASS
+        else:
+            derived_window_status = "CLOSED"
+            w_diag = (
+                f"Application window is CLOSED (closed on: {window_close_val or 'Unspecified'})."
+            )
+            w_outcome = RuleOutcome.FAIL
+    else:
+        derived_window_status = "CLOSED"
+        w_diag = f"Application window is CLOSED (closed on: {window_close_val or 'Unspecified'})."
+        w_outcome = RuleOutcome.FAIL
+
+    return (
+        derived_window_status,
+        portal_type_val,
+        portal_status_val,
+        window_close_val,
+        w_outcome,
+        w_diag,
+    )
 
 
 def evaluate_scheme_for_student(
@@ -37,11 +74,20 @@ def evaluate_scheme_for_student(
                     outcome=RuleOutcome.UNKNOWN,
                     explanation_en="No version registered for this scheme.",
                     missing_fields=["scheme_version"],
-                )
+                ),
+                RuleDiagnostic(
+                    clause_name="Application Window Status",
+                    outcome=RuleOutcome.FAIL,
+                    explanation_en="Application window is CLOSED (closed on: Unspecified).",
+                ),
             ],
             missing_fields=["scheme_version"],
             ineligibility_reasons=[],
             official_source_url=scheme.canonical_source_url,
+            window_status="CLOSED",
+            status_label="Conditionally eligible / information missing",
+            academic_year="2025-2026",
+            window_close_date=None,
         )
 
     # Sort to get highest version number
@@ -52,6 +98,15 @@ def evaluate_scheme_for_student(
         latest_version.verification_status != VerificationStatus.OFFICIAL_VERIFIED
         or latest_version.eligibility_rule is None
     ):
+        (
+            w_status,
+            portal_type_val,
+            portal_status_val,
+            window_close_val,
+            w_outcome,
+            w_diag,
+        ) = _derive_window_info(latest_version.application_window)
+
         return SchemeEvaluationResult(
             scheme_id=scheme.scheme_id,
             scheme_title=scheme.title_en,
@@ -63,30 +118,22 @@ def evaluate_scheme_for_student(
                     outcome=RuleOutcome.UNKNOWN,
                     explanation_en="Scheme does not have verified statutory eligibility rules.",
                     missing_fields=["verified_eligibility_rules"],
-                )
+                ),
+                RuleDiagnostic(
+                    clause_name="Application Window Status",
+                    outcome=w_outcome,
+                    explanation_en=w_diag,
+                ),
             ],
             missing_fields=["verified_eligibility_rules"],
             ineligibility_reasons=[],
             official_source_url=scheme.canonical_source_url,
-            portal_type=(
-                latest_version.application_window.portal_type.value
-                if latest_version.application_window
-                else None
-            ),
-            portal_status=(
-                latest_version.application_window.portal_status.value
-                if latest_version.application_window
-                else None
-            ),
-            window_status="CLOSED",
+            portal_type=portal_type_val,
+            portal_status=portal_status_val,
+            window_status=w_status,
             status_label="Conditionally eligible / information missing",
             academic_year=latest_version.academic_year,
-            window_close_date=(
-                str(latest_version.application_window.window_close_date)
-                if latest_version.application_window
-                and latest_version.application_window.window_close_date
-                else None
-            ),
+            window_close_date=window_close_val,
         )
 
     rule = latest_version.eligibility_rule
@@ -399,22 +446,14 @@ def evaluate_scheme_for_student(
         overall_outcome = EvaluationOutcome.ELIGIBLE
 
     # Portal details & statutory window derivation
-    window = latest_version.application_window
-    portal_type_val = window.portal_type.value if window else None
-    portal_status_val = window.portal_status.value if window else None
-    window_close_val = (
-        str(window.window_close_date) if window and window.window_close_date else None
-    )
-
-    # Statutory window check: OPEN only when today is inside statutory window dates
-    today = date.today()
-    if window and window.window_open_date is not None and window.window_close_date is not None:
-        if window.window_open_date <= today <= window.window_close_date:
-            derived_window_status = "OPEN"
-        else:
-            derived_window_status = "CLOSED"
-    else:
-        derived_window_status = "CLOSED"
+    (
+        derived_window_status,
+        portal_type_val,
+        portal_status_val,
+        window_close_val,
+        w_outcome,
+        w_diag,
+    ) = _derive_window_info(latest_version.application_window)
 
     # Derive human-readable status_label
     if overall_outcome == EvaluationOutcome.ELIGIBLE:
@@ -428,15 +467,10 @@ def evaluate_scheme_for_student(
         status_label = "Conditionally eligible / information missing"
 
     # Append operational window status diagnostic
-    if derived_window_status == "OPEN" and window is not None:
-        w_diag = f"Application window is OPEN (dates: {window.window_open_date} to {window.window_close_date})."
-    else:
-        w_diag = f"Application window is CLOSED (closed on: {window_close_val or 'Unspecified'})."
-
     diagnostics.append(
         RuleDiagnostic(
             clause_name="Application Window Status",
-            outcome=RuleOutcome.PASS,
+            outcome=w_outcome,
             explanation_en=w_diag,
         )
     )

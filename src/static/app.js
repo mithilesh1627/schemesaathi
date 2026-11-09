@@ -331,10 +331,8 @@
         const windowClose =
           sch.window_close_date ||
           (sch.scheme_id === "SCH-MN-003"
-            ? "2026-03-31"
-            : sch.scheme_id === "SCH-MN-006"
-            ? "2025-10-31"
-            : "2025-11-30");
+            ? "Not published / Closed"
+            : "2025-10-31");
 
         const statusNote =
           sch.status_label ||
@@ -507,7 +505,7 @@
         const c = citationMap[num];
         if (c && c.source_url) {
           const sec = c.section || c.section_title || "Guideline Section";
-          return ` <a href="${c.source_url}" target="_blank" rel="noopener noreferrer" class="citation-link" title="${c.scheme_id}: ${sec} (AY ${c.academic_year || '2025-2026'}, Closed: ${c.window_close_date || '2025-11-30'})">[${num}]</a>`;
+          return ` <a href="${c.source_url}" target="_blank" rel="noopener noreferrer" class="citation-link" title="${c.scheme_id}: ${sec} (AY ${c.academic_year || '2025-2026'}, Closed: ${c.window_close_date || '2025-10-31'})">[${num}]</a>`;
         }
         return ` [^${num}]`;
       });
@@ -558,7 +556,7 @@
             return `<span class="citation-pill">
               <strong>[${num}]</strong>
               <a href="${c.source_url}" target="_blank" rel="noopener noreferrer">${c.scheme_id}</a>
-              &bull; AY ${c.academic_year || "2025-2026"} &bull; Closed: ${c.window_close_date || "2025-11-30"}
+              &bull; AY ${c.academic_year || "2025-2026"} &bull; Closed: ${c.window_close_date || "2025-10-31"}
             </span>`;
           })
           .join("");

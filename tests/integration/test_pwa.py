@@ -233,7 +233,7 @@ async def test_pwa_chat_flow_citations_and_error_handling(
     assert cit["scheme_id"] == "SCH-MN-005"
     assert cit["source_url"].startswith("http")
     assert cit["academic_year"] == "2025-2026"
-    assert cit["window_close_date"] == "2025-11-30"
+    assert cit["window_close_date"] == "2025-10-31"
 
     # 2. Verify plain-language Ollama error in PWA client JS
     res_js = await async_client.get("/static/app.js")
