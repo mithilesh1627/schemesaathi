@@ -108,7 +108,7 @@ class EligibilityEvaluatorService:
                 for r in evaluation_results:
                     # Map domain EvaluationOutcome to database EvaluationStatus enum
                     if r.overall_outcome == EvaluationOutcome.ELIGIBLE:
-                        if r.portal_status == "CLOSED":
+                        if r.window_status == "CLOSED" or r.portal_status == "CLOSED":
                             db_status = EvaluationStatus.ELIGIBLE_OFF_CYCLE
                         else:
                             db_status = EvaluationStatus.ELIGIBLE_NOW
@@ -158,6 +158,10 @@ class EligibilityEvaluatorService:
                 official_source_url=r.official_source_url,
                 portal_type=r.portal_type,
                 portal_status=r.portal_status,
+                window_status=r.window_status,
+                status_label=r.status_label,
+                academic_year=r.academic_year,
+                window_close_date=r.window_close_date,
             )
             for r in evaluation_results
         ]

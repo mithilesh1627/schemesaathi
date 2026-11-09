@@ -72,6 +72,7 @@ def parse_extracted_text_to_sections(
         if (
             "Official Government Statutory Guidelines" in line
             or "2024-2025" in line
+            or "2025-2026" in line
             or line.lower() == scheme_title.lower()
         ):
             i += 1

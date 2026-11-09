@@ -169,10 +169,10 @@ async def test_golden_closed_window_surfacing(async_client: AsyncClient) -> None
     data = resp.json()
     assert data["total_results"] > 0
 
-    # Pre-Matric ST window closed on 2024-10-31
+    # Pre-Matric ST window closed on 2025-10-31
     target_chunk = next(r for r in data["results"] if r["scheme_id"] == "SCH-MN-006")
     assert target_chunk["application_window"]["is_window_closed"] is True
-    assert target_chunk["application_window"]["window_close_date"] == "2024-10-31"
+    assert target_chunk["application_window"]["window_close_date"] == "2025-10-31"
 
 
 @pytest.mark.asyncio

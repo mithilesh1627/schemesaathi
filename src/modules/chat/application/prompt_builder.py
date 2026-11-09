@@ -48,7 +48,7 @@ class ChatPromptBuilder:
                 sch_id = chunk.get("scheme_id", "SCH-GEN")
                 sec_title = chunk.get("section_title") or chunk.get("section", "Guidelines")
                 src_url = chunk.get("source_url", "")
-                academic_yr = chunk.get("academic_year", "2024-2025")
+                academic_yr = chunk.get("academic_year", "2025-2026")
                 window_close = chunk.get("window_close_date", "CLOSED")
                 content = chunk.get("chunk_content", "").strip()
 

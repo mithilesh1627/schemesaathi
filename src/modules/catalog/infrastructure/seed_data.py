@@ -49,13 +49,13 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
         "guidelines_document_url": "https://scholarships.gov.in/public/schemeGuidelines/Manipur_state_scheme/manipur_Guidelines_3056.pdf",
         "version": {
             "version_number": 1,
-            "academic_year": "2024-2025",
+            "academic_year": "2025-2026",
             "guideline_publication_date": date(2023, 8, 1),
             "content_sha256": "9596807e57debb7b141d18815054363e130a4e7cd454f5bea58598a6ce7ae22c",
             "storage_path": "documents/95/9596807e57debb7b141d18815054363e130a4e7cd454f5bea58598a6ce7ae22c.pdf",
             "verification_status": VerificationStatus.OFFICIAL_VERIFIED,
             "verified_by_user_id": "m0_statutory_auditor",
-            "verification_notes": "Verified against Higher Education Manipur official circular August 2023.",
+            "verification_notes": "Verified against Higher Education Manipur official circular August 2023 governing academic year 2025-2026.",
         },
         "rule": {
             "income_ceiling_annual_inr": 450000.00,
@@ -77,9 +77,9 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
         "window": {
             "portal_type": PortalType.NSP_2_0,
             "portal_url": "https://scholarships.gov.in",
-            "portal_status": PortalWindowStatus.OPEN,
-            "window_open_date": date(2024, 7, 1),
-            "window_close_date": date(2024, 11, 30),
+            "portal_status": PortalWindowStatus.CLOSED,
+            "window_open_date": date(2025, 7, 1),
+            "window_close_date": date(2025, 11, 30),
             "requires_otr_face_rd": True,
         },
         "benefit": {
@@ -102,13 +102,13 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
         "guidelines_document_url": "https://scholarships.gov.in/public/schemeGuidelines/EDUPostMatricScholarshipPMSforSTstudents.pdf",
         "version": {
             "version_number": 1,
-            "academic_year": "2024-2025",
+            "academic_year": "2025-2026",
             "guideline_publication_date": date(2022, 6, 1),
             "content_sha256": "eb53bc37acc93eccbe811f648e7e741ea05b607db796dc1b759cc8e987256efe",
             "storage_path": "documents/eb/eb53bc37acc93eccbe811f648e7e741ea05b607db796dc1b759cc8e987256efe.pdf",
             "verification_status": VerificationStatus.OFFICIAL_VERIFIED,
             "verified_by_user_id": "m0_statutory_auditor",
-            "verification_notes": "Verified against MoTA Centrally Sponsored Scheme Guidelines 2022.",
+            "verification_notes": "Verified against MoTA Centrally Sponsored Scheme Guidelines governing academic year 2025-2026.",
         },
         "rule": {
             "income_ceiling_annual_inr": 250000.00,
@@ -140,9 +140,9 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
         "window": {
             "portal_type": PortalType.NSP_2_0,
             "portal_url": "https://scholarships.gov.in",
-            "portal_status": PortalWindowStatus.OPEN,
-            "window_open_date": date(2024, 7, 1),
-            "window_close_date": date(2024, 11, 30),
+            "portal_status": PortalWindowStatus.CLOSED,
+            "window_open_date": date(2025, 7, 1),
+            "window_close_date": date(2025, 11, 30),
             "requires_otr_face_rd": True,
         },
         "benefit": {
@@ -167,13 +167,13 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
         "guidelines_document_url": "https://scholarships.gov.in/public/schemeGuidelines/Centrally%20Sponsored%20Scheme%20of%20Post%20Matric%20Scholarship%20Scheme%20for%20OBC_scheme.pdf",
         "version": {
             "version_number": 1,
-            "academic_year": "2024-2025",
+            "academic_year": "2025-2026",
             "guideline_publication_date": date(2023, 7, 1),
             "content_sha256": "3e7cea65397d06b42644681257beea11193aff243a5aa398818f6f2c2dbfdaf5",
             "storage_path": "documents/3e/3e7cea65397d06b42644681257beea11193aff243a5aa398818f6f2c2dbfdaf5.pdf",
             "verification_status": VerificationStatus.OFFICIAL_VERIFIED,
             "verified_by_user_id": "m0_statutory_auditor",
-            "verification_notes": "Verified against PM-YASASVI OBC Post-Matric Framework July 2023.",
+            "verification_notes": "Verified against PM-YASASVI OBC Post-Matric Framework July 2023 (valid 2021-2022 to 2025-2026).",
         },
         "rule": {
             "income_ceiling_annual_inr": 250000.00,
@@ -205,9 +205,9 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
         "window": {
             "portal_type": PortalType.NSP_2_0,
             "portal_url": "https://scholarships.gov.in",
-            "portal_status": PortalWindowStatus.OPEN,
-            "window_open_date": date(2024, 7, 1),
-            "window_close_date": date(2024, 11, 30),
+            "portal_status": PortalWindowStatus.CLOSED,
+            "window_open_date": date(2025, 7, 1),
+            "window_close_date": date(2025, 11, 30),
             "requires_otr_face_rd": True,
         },
         "benefit": {
@@ -232,13 +232,13 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
         "guidelines_document_url": "https://scholarships.gov.in/public/schemeGuidelines/Postmatric_SC.pdf",
         "version": {
             "version_number": 1,
-            "academic_year": "2024-2025",
+            "academic_year": "2025-2026",
             "guideline_publication_date": date(2021, 1, 1),
             "content_sha256": "cf73697baff4d7ebaf5919363296479b501ea9efc146a27de50623a9472cfa57",
             "storage_path": "documents/cf/cf73697baff4d7ebaf5919363296479b501ea9efc146a27de50623a9472cfa57.pdf",
             "verification_status": VerificationStatus.OFFICIAL_VERIFIED,
             "verified_by_user_id": "m0_statutory_auditor",
-            "verification_notes": "Verified against Revised Centrally Sponsored SC Post-Matric Scheme 2021.",
+            "verification_notes": "Verified against Revised Centrally Sponsored SC Post-Matric Scheme March 2021 (valid 2020-2021 to 2025-2026).",
         },
         "rule": {
             "income_ceiling_annual_inr": 250000.00,
@@ -270,9 +270,9 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
         "window": {
             "portal_type": PortalType.NSP_2_0,
             "portal_url": "https://scholarships.gov.in",
-            "portal_status": PortalWindowStatus.OPEN,
-            "window_open_date": date(2024, 7, 1),
-            "window_close_date": date(2024, 11, 30),
+            "portal_status": PortalWindowStatus.CLOSED,
+            "window_open_date": date(2025, 7, 1),
+            "window_close_date": date(2025, 11, 30),
             "requires_otr_face_rd": True,
             "requires_freeship_card": True,
         },
@@ -298,13 +298,13 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
         "guidelines_document_url": "https://scholarships.gov.in/public/schemeGuidelines/guidelines-Pre-matric-ST.pdf",
         "version": {
             "version_number": 1,
-            "academic_year": "2024-2025",
+            "academic_year": "2025-2026",
             "guideline_publication_date": date(2022, 6, 1),
             "content_sha256": "8e35745e3319bfe532502d9c28e49d6ce704ec1a95a87bd7e983631b1a99474b",
             "storage_path": "documents/8e/8e35745e3319bfe532502d9c28e49d6ce704ec1a95a87bd7e983631b1a99474b.pdf",
             "verification_status": VerificationStatus.OFFICIAL_VERIFIED,
             "verified_by_user_id": "m0_statutory_auditor",
-            "verification_notes": "Verified against Revised 2022 CSS MoTA Guidelines for Pre-Matric ST.",
+            "verification_notes": "Verified against Revised 2022 CSS MoTA Guidelines for Pre-Matric ST (valid 2021-2022 to 2025-2026).",
         },
         "rule": {
             "income_ceiling_annual_inr": 250000.00,
@@ -327,8 +327,8 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
             "portal_type": PortalType.NSP_2_0,
             "portal_url": "https://scholarships.gov.in",
             "portal_status": PortalWindowStatus.CLOSED,
-            "window_open_date": date(2024, 7, 1),
-            "window_close_date": date(2024, 10, 31),
+            "window_open_date": date(2025, 7, 1),
+            "window_close_date": date(2025, 10, 31),
             "requires_otr_face_rd": True,
         },
         "benefit": {
@@ -354,13 +354,13 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
         "guidelines_document_url": "https://highereducationmanipur.gov.in/chief-ministers-college-students-rehabilitation-scheme-cmcsrs-2023/",
         "version": {
             "version_number": 1,
-            "academic_year": "2024-2025",
+            "academic_year": "2025-2026",
             "guideline_publication_date": date(2023, 7, 1),
             "content_sha256": "8d1949278ec951864b7f21fbc171f8afa99fdb4dcb2bc767e3b18a81d3ae7ff8",
             "storage_path": "documents/8d/8d1949278ec951864b7f21fbc171f8afa99fdb4dcb2bc767e3b18a81d3ae7ff8.pdf",
             "verification_status": VerificationStatus.OFFICIAL_VERIFIED,
             "verified_by_user_id": "m0_statutory_auditor",
-            "verification_notes": "Verified against Higher Education Manipur Notification July 2023 for displaced students.",
+            "verification_notes": "Verified against Higher Education Manipur Notification July 2023 for displaced students, continued for 2025-2026.",
         },
         "rule": {
             "income_ceiling_annual_inr": None,
@@ -381,9 +381,9 @@ VERIFIED_PILOT_SCHEMES: list[dict[str, Any]] = [
         "window": {
             "portal_type": PortalType.STATE_DIRECT_PORTAL,
             "portal_url": "https://highereducationmanipur.gov.in",
-            "portal_status": PortalWindowStatus.OPEN,
-            "window_open_date": date(2024, 7, 1),
-            "window_close_date": date(2025, 3, 31),
+            "portal_status": PortalWindowStatus.CLOSED,
+            "window_open_date": date(2025, 7, 1),
+            "window_close_date": date(2026, 3, 31),
         },
         "benefit": {
             "tuition_fee_coverage_desc": "100% full tuition and college admission fee waiver with free college transfer.",
@@ -507,6 +507,21 @@ async def seed_pilot_schemes(session: AsyncSession) -> int:
                 ver_data = data["version"]
                 latest_ver.storage_path = ver_data.get("storage_path")
                 latest_ver.content_sha256 = ver_data["content_sha256"]
+                latest_ver.academic_year = ver_data["academic_year"]
+                latest_ver.verification_notes = ver_data.get("verification_notes")
+
+                # Sync application window
+                win_stmt = select(SchemeApplicationWindow).where(
+                    SchemeApplicationWindow.version_id == latest_ver.version_id
+                )
+                win_res = await session.execute(win_stmt)
+                win = win_res.scalars().first()
+                if win:
+                    win_data = data["window"]
+                    win.portal_status = win_data["portal_status"]
+                    win.window_open_date = win_data["window_open_date"]
+                    win.window_close_date = win_data["window_close_date"]
+                    win.portal_url = win_data["portal_url"]
 
     await session.commit()
     logger.info("Seeded %d verified Manipur pilot schemes into catalog.", seeded_count)

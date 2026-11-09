@@ -207,8 +207,14 @@ class ChatService:
                             status=r.overall_outcome.value,
                             reason="; ".join(r.ineligibility_reasons)
                             if r.ineligibility_reasons
-                            else "Criteria satisfied.",
+                            else (
+                                "Criteria satisfied (window closed)."
+                                if r.window_status == "CLOSED"
+                                else "Criteria satisfied."
+                            ),
                             rule_description="; ".join(d.explanation_en for d in r.diagnostics),
+                            window_status=r.window_status,
+                            status_label=r.status_label,
                         )
                         for r in batch_resp.schemes
                     ]

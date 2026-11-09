@@ -27,7 +27,7 @@ logger = get_logger(__name__)
 RRF_K = 60  # Reciprocal Rank Fusion smoothing constant as specified in M0 architecture
 STATUTORY_DISCLAIMER = (
     "Search results reflect retrieved statutory guidelines only. "
-    "Application windows for academic year 2024-2025 are closed."
+    "Application windows for academic year 2025-2026 are closed."
 )
 
 

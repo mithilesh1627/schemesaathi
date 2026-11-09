@@ -175,12 +175,18 @@ async def test_pwa_eligibility_flow_demo_profiles(async_client: AsyncClient) -> 
 
     schemes1 = {s["scheme_id"]: s for s in data1["schemes"]}
     assert schemes1["SCH-MN-005"]["overall_outcome"] == "ELIGIBLE"  # Post-Matric ST
+    assert schemes1["SCH-MN-005"]["window_status"] == "CLOSED"
+    assert schemes1["SCH-MN-005"]["status_label"] == "Eligible by rules, window closed"
     assert schemes1["SCH-MN-001"]["overall_outcome"] == "ELIGIBLE"  # Merit Stipend
+    assert schemes1["SCH-MN-001"]["window_status"] == "CLOSED"
+    assert schemes1["SCH-MN-001"]["status_label"] == "Eligible by rules, window closed"
     assert schemes1["SCH-MN-003"]["overall_outcome"] == "NOT_ELIGIBLE"  # Displaced scheme fails
+    assert schemes1["SCH-MN-003"]["status_label"] == "Not eligible"
 
     # Verify official source URLs and portal statuses
     for s in data1["schemes"]:
         assert s["official_source_url"].startswith("http")
+        assert s["window_status"] == "CLOSED"
 
     # 2. Displaced ST Manipur profile (SCH-MN-003 flips to ELIGIBLE)
     displaced_payload = dict(non_displaced_payload)
@@ -226,8 +232,8 @@ async def test_pwa_chat_flow_citations_and_error_handling(
     cit = data["citations"][0]
     assert cit["scheme_id"] == "SCH-MN-005"
     assert cit["source_url"].startswith("http")
-    assert cit["academic_year"] == "2024-2025"
-    assert cit["window_close_date"] == "2024-11-30"
+    assert cit["academic_year"] == "2025-2026"
+    assert cit["window_close_date"] == "2025-11-30"
 
     # 2. Verify plain-language Ollama error in PWA client JS
     res_js = await async_client.get("/static/app.js")

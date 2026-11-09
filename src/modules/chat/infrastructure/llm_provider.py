@@ -209,9 +209,9 @@ class DeterministicTestLlmProvider(BaseLlmProvider):
         ):
             chunk = retrieved_chunks[0]
             sch_id = chunk.get("scheme_id", "SCH-GEN")
-            window_close = chunk.get("window_close_date", "2024-11-30")
+            window_close = chunk.get("window_close_date", "2025-11-30")
             portal_status = chunk.get("portal_status", "CLOSED")
-            academic_yr = chunk.get("academic_year", "2024-2025")
+            academic_yr = chunk.get("academic_year", "2025-2026")
 
             return (
                 f"According to the official statutory guideline for {sch_id} [^1], the application "

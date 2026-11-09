@@ -62,6 +62,10 @@ class SchemeEvaluationResult:
     official_source_url: str
     portal_type: str | None = None
     portal_status: str | None = None
+    window_status: str = "CLOSED"
+    status_label: str = ""
+    academic_year: str = "2025-2026"
+    window_close_date: str | None = None
     passed_income_check: bool = False
     passed_category_check: bool = False
     passed_domicile_check: bool = False

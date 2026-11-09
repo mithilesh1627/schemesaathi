@@ -16,9 +16,9 @@ def test_valid_citations_resolve_to_retrieved_chunks() -> None:
             "chunk_content": "Maintenance allowance is 550 per month for day scholars and 1200 per month for hostellers.",
             "source_url": "https://scholarships.gov.in/st.pdf",
             "content_sha256": "eb53bc37acc93eccbe811f648e7e741ea05b607db796dc1b759cc8e987256efe",
-            "academic_year": "2024-2025",
-            "window_close_date": "2024-11-30",
-            "portal_status": "OPEN",
+            "academic_year": "2025-2026",
+            "window_close_date": "2025-11-30",
+            "portal_status": "CLOSED",
         },
         {
             "chunk_id": "chunk-222",
@@ -27,9 +27,9 @@ def test_valid_citations_resolve_to_retrieved_chunks() -> None:
             "chunk_content": "Up to ₹7,500 per annum merit stipend disbursed via PFMS.",
             "source_url": "https://scholarships.gov.in/merit.pdf",
             "content_sha256": "9596807e57debb7b141d18815054363e130a4e7cd454f5bea58598a6ce7ae22c",
-            "academic_year": "2024-2025",
-            "window_close_date": "2024-11-30",
-            "portal_status": "OPEN",
+            "academic_year": "2025-2026",
+            "window_close_date": "2025-11-30",
+            "portal_status": "CLOSED",
         },
     ]
 

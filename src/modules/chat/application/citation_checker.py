@@ -324,7 +324,7 @@ class CitationEngine:
                 ),
                 source_url=str(chunk.get("source_url", "")),
                 content_sha256=str(chunk.get("content_sha256", "")),
-                academic_year=str(chunk.get("academic_year", "2024-2025")),
+                academic_year=str(chunk.get("academic_year", "2025-2026")),
                 window_close_date=chunk.get("window_close_date"),
                 portal_status=chunk.get("portal_status"),
             )

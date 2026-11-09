@@ -306,7 +306,7 @@ class RetrievalRepository:
 
             doc_sha = ver.content_sha256 if ver else chunk.content_sha256
             source_url = sch.guidelines_document_url if sch else ""
-            academic_year = ver.academic_year if ver else "2024-2025"
+            academic_year = ver.academic_year if ver else "2025-2026"
 
             window_open = win.window_open_date if win else None
             window_close = win.window_close_date if win else None

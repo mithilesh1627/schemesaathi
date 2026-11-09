@@ -77,6 +77,8 @@ class EligibilityItemResult(BaseModel):
     status: str
     reason: str
     rule_description: str
+    window_status: str | None = None
+    status_label: str | None = None
 
 
 class ChatMessageResponse(BaseModel):
@@ -112,7 +114,7 @@ class SchemeChecklistResponse(BaseModel):
 
     scheme_id: str = Field(..., description="Canonical scheme identifier.")
     title: str = Field(..., description="Official scheme title in English.")
-    academic_year: str = Field(default="2024-2025", description="Academic year.")
+    academic_year: str = Field(default="2025-2026", description="Academic year.")
     window_close_date: str | None = Field(None, description="Application window close date.")
     portal_status: str = Field(default="CLOSED", description="Application portal window status.")
     portal_url: str = Field(..., description="Official government application portal URL.")

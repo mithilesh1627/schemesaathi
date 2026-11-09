@@ -103,6 +103,16 @@ class SchemeEvaluationResponse(BaseModel):
     official_source_url: str
     portal_type: str | None = None
     portal_status: str | None = None
+    window_status: str = Field(
+        default="CLOSED",
+        description="Statutory window status (OPEN or CLOSED) derived strictly from window dates.",
+    )
+    status_label: str = Field(
+        default="",
+        description="Human-readable outcome description, e.g. 'Eligible by rules, window closed'.",
+    )
+    academic_year: str = Field(default="2025-2026", description="Governing academic year.")
+    window_close_date: str | None = Field(default=None, description="Window close date.")
 
 
 class BatchEvaluationResponse(BaseModel):

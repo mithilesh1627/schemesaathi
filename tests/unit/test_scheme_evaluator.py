@@ -8,7 +8,7 @@ Verifies:
 """
 
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from src.modules.catalog.domain.enums import (
@@ -38,6 +38,10 @@ def _build_test_scheme(
     eligible_courses: list[str] | None = None,
     has_rule: bool = True,
     ast_logic: dict[str, Any] | None = None,
+    academic_year: str = "2025-2026",
+    window_open_date: date | None = None,
+    window_close_date: date | None = None,
+    portal_status: PortalWindowStatus = PortalWindowStatus.CLOSED,
 ) -> Scheme:
     """Helper to build in-memory Scheme objects for testing."""
     if target_categories is None:
@@ -66,8 +70,8 @@ def _build_test_scheme(
         version_id=uuid.uuid4(),
         scheme_id=scheme.scheme_id,
         version_number=1,
-        academic_year="2024-2025",
-        guideline_publication_date=date(2024, 1, 1),
+        academic_year=academic_year,
+        guideline_publication_date=date(2025, 1, 1),
         content_sha256="test-sha256-hash",
         lifecycle_state=DocumentLifecycleState.STORED.value,
         verification_status=verification_status,
@@ -96,7 +100,9 @@ def _build_test_scheme(
         version_id=version.version_id,
         portal_type=PortalType.NSP_2_0,
         portal_url="https://scholarships.gov.in",
-        portal_status=PortalWindowStatus.OPEN,
+        portal_status=portal_status,
+        window_open_date=window_open_date,
+        window_close_date=window_close_date,
     )
     version.application_window = window
 
@@ -230,3 +236,62 @@ class TestSchemeEvaluatorOutcomes:
         res = evaluate_scheme_for_student(scheme, profile)
         assert res.overall_outcome == EvaluationOutcome.NOT_ELIGIBLE
         assert res.passed_income_check is False
+
+    def test_window_status_closed_derived_from_dates_even_if_portal_status_open(self) -> None:
+        """Requirement: Window status derived from dates, never copied from portal_status alone."""
+        today = date.today()
+        # Scheme window closed yesterday, but portal_status is OPEN
+        scheme = _build_test_scheme(
+            portal_status=PortalWindowStatus.OPEN,
+            window_open_date=today - timedelta(days=60),
+            window_close_date=today - timedelta(days=1),
+        )
+        profile = StudentProfile(
+            domicile_state="MANIPUR",
+            social_category="ST",
+            annual_family_income_inr=150000.0,
+            course_level="UNDERGRADUATE",
+        )
+        res = evaluate_scheme_for_student(scheme, profile)
+        assert res.overall_outcome == EvaluationOutcome.ELIGIBLE
+        assert res.portal_status == "OPEN"
+        assert res.window_status == "CLOSED"
+        assert res.status_label == "Eligible by rules, window closed"
+        assert any("window is CLOSED" in d.explanation_en for d in res.diagnostics)
+
+    def test_window_status_open_when_today_is_inside_window(self) -> None:
+        """Requirement: Window status is OPEN when today is inside statutory window."""
+        today = date.today()
+        scheme = _build_test_scheme(
+            portal_status=PortalWindowStatus.OPEN,
+            window_open_date=today - timedelta(days=10),
+            window_close_date=today + timedelta(days=20),
+        )
+        profile = StudentProfile(
+            domicile_state="MANIPUR",
+            social_category="ST",
+            annual_family_income_inr=150000.0,
+            course_level="UNDERGRADUATE",
+        )
+        res = evaluate_scheme_for_student(scheme, profile)
+        assert res.overall_outcome == EvaluationOutcome.ELIGIBLE
+        assert res.window_status == "OPEN"
+        assert res.status_label == "Eligible, window open"
+        assert any("window is OPEN" in d.explanation_en for d in res.diagnostics)
+
+    def test_window_status_closed_when_window_dates_are_none(self) -> None:
+        """When window dates are missing, window_status safely defaults to CLOSED."""
+        scheme = _build_test_scheme(
+            window_open_date=None,
+            window_close_date=None,
+        )
+        profile = StudentProfile(
+            domicile_state="MANIPUR",
+            social_category="ST",
+            annual_family_income_inr=150000.0,
+            course_level="UNDERGRADUATE",
+        )
+        res = evaluate_scheme_for_student(scheme, profile)
+        assert res.overall_outcome == EvaluationOutcome.ELIGIBLE
+        assert res.window_status == "CLOSED"
+        assert res.status_label == "Eligible by rules, window closed"

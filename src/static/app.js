@@ -69,7 +69,7 @@
       tabChat: "SchemeSaathi-da Hangba",
       tabChecklist: "Eigi Document-sing",
       eligibilityTitle: "Statutory Eligibility Yengba",
-      eligibilityDesc: "Government guideline-da yumfam ouraga deterministic rule-na yengba. Pilot scheme 6 mak AY 2024-2025 gi window thingkhraba ngaktani.",
+      eligibilityDesc: "Government guideline-da yumfam ouraga deterministic rule-na yengba. Pilot scheme 6 mak AY 2025-2026 gi window thingkhraba ngaktani.",
       lblDomicile: "Leikhibagi State (Domicile)",
       lblCategory: "Social Category (Caste/Tribe)",
       lblIncome: "Chahigi Imunggi Senfam (₹)",
@@ -326,13 +326,21 @@
         const badgeLabel = sch.overall_outcome.replace("_", " ");
 
         // Academic year and statutory window dates
-        const ay = "2024-2025";
+        const ay = sch.academic_year || "2025-2026";
+        const windowStatus = sch.window_status || "CLOSED";
         const windowClose =
-          sch.scheme_id === "SCH-MN-003"
-            ? "2025-03-31"
+          sch.window_close_date ||
+          (sch.scheme_id === "SCH-MN-003"
+            ? "2026-03-31"
             : sch.scheme_id === "SCH-MN-006"
-            ? "2024-10-31"
-            : "2024-11-30";
+            ? "2025-10-31"
+            : "2025-11-30");
+
+        const statusNote =
+          sch.status_label ||
+          (sch.overall_outcome === "ELIGIBLE" && windowStatus === "CLOSED"
+            ? "Eligible by rules, window closed"
+            : badgeLabel);
 
         let diagHtml = "";
         if (sch.diagnostics && sch.diagnostics.length > 0) {
@@ -357,13 +365,14 @@
         card.innerHTML = `
           <div class="scheme-header">
             <div class="scheme-title">${sch.scheme_title}</div>
-            <span class="badge ${badgeClass}">${badgeLabel}</span>
+            <span class="badge ${badgeClass}">${badgeLabel}${sch.overall_outcome === 'ELIGIBLE' && windowStatus === 'CLOSED' ? ' (Window Closed)' : ''}</span>
           </div>
           <div class="scheme-meta">
             <span><strong>Scheme ID:</strong> ${sch.scheme_id}</span>
             <span><strong>Academic Year:</strong> ${ay}</span>
-            <span class="window-badge">Window Closed: ${windowClose} (CLOSED)</span>
+            <span class="window-badge">Window: ${windowClose} (${windowStatus})</span>
           </div>
+          <div style="font-size:0.85rem; color:#475569; margin-top:0.25rem;"><strong>Status:</strong> ${statusNote}</div>
           <div class="diag-list">${diagHtml}</div>
           ${ineligHtml}
           <div>
@@ -498,7 +507,7 @@
         const c = citationMap[num];
         if (c && c.source_url) {
           const sec = c.section || c.section_title || "Guideline Section";
-          return ` <a href="${c.source_url}" target="_blank" rel="noopener noreferrer" class="citation-link" title="${c.scheme_id}: ${sec} (AY ${c.academic_year || '2024-2025'}, Closed: ${c.window_close_date || '2024-11-30'})">[${num}]</a>`;
+          return ` <a href="${c.source_url}" target="_blank" rel="noopener noreferrer" class="citation-link" title="${c.scheme_id}: ${sec} (AY ${c.academic_year || '2025-2026'}, Closed: ${c.window_close_date || '2025-11-30'})">[${num}]</a>`;
         }
         return ` [^${num}]`;
       });
@@ -518,12 +527,16 @@
                 : sch.status === "NOT_ELIGIBLE"
                 ? "color:#dc2626;"
                 : "color:#d97706;";
+            const labelSuffix =
+              sch.status === "ELIGIBLE" && sch.window_status === "CLOSED"
+                ? " (Window Closed)"
+                : "";
             const reasonHtml = sch.reason
               ? `<div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.15rem;">${sch.reason}</div>`
               : "";
             return `<div style="margin-bottom:0.4rem;">
               <strong>${sch.scheme_title}:</strong>
-              <span style="${outcomeClass} font-weight:700;"> ${sch.status}</span>
+              <span style="${outcomeClass} font-weight:700;"> ${sch.status}${labelSuffix}</span>
               ${reasonHtml}
             </div>`;
           })
@@ -545,7 +558,7 @@
             return `<span class="citation-pill">
               <strong>[${num}]</strong>
               <a href="${c.source_url}" target="_blank" rel="noopener noreferrer">${c.scheme_id}</a>
-              &bull; AY ${c.academic_year || "2024-2025"} &bull; Closed: ${c.window_close_date || "2024-11-30"}
+              &bull; AY ${c.academic_year || "2025-2026"} &bull; Closed: ${c.window_close_date || "2025-11-30"}
             </span>`;
           })
           .join("");
