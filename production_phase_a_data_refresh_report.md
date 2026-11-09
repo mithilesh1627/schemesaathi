@@ -450,10 +450,15 @@ TOTAL                                                         3614    367    90%
 195 passed, 8 skipped in 297.18s (0:04:57)
 ```
 
-### Static Analysis Checks
-- **Ruff Lint:** `ruff check src tests` -> `All checks passed!`
-- **Ruff Format:** `ruff format --check src tests` -> `91 files already formatted`
-- **Mypy Strict:** `mypy src tests` -> `Success: no issues found in 91 source files`
+### Static Analysis & CI Pipeline Verification
+- **GitHub Actions Run ID:** [42656965775](https://github.com/mithilesh1627/schemesaathi/actions/runs/42656965775)
+- **Commit:** `d26824d` (`feat(phase-a): refresh dataset to AY 2025-26 and enforce statutory window status`)
+- **Job 1 (Code Quality):** `completed / success` (Ruff lint, Ruff format check, Mypy strict typing across 91 source files).
+- **Job 2 (Automated Unit & Integration Tests):** `completed / success` (Full pytest suite running against live PostgreSQL 16 + pgvector container and Redis cluster; all 203 collected items passed, 90% code coverage).
+- **Local Checks:**
+  - `ruff check src tests` -> `All checks passed!`
+  - `ruff format --check src tests` -> `91 files already formatted`
+  - `mypy src tests` -> `Success: no issues found in 91 source files`
 
 ---
 
