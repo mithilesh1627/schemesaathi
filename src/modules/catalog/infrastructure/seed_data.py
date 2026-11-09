@@ -492,6 +492,21 @@ async def seed_pilot_schemes(session: AsyncSession) -> int:
                 benefit_summary_en=ben_data["benefit_summary_en"],
             )
             session.add(benefit)
+        else:
+            # Sync mutable guidelines document URL and version storage path
+            scheme.guidelines_document_url = data["guidelines_document_url"]
+            scheme.canonical_source_url = data["canonical_source_url"]
+            ver_stmt = (
+                select(SchemeVersion)
+                .where(SchemeVersion.scheme_id == scheme_id)
+                .order_by(SchemeVersion.version_number.desc())
+            )
+            ver_res = await session.execute(ver_stmt)
+            latest_ver = ver_res.scalars().first()
+            if latest_ver:
+                ver_data = data["version"]
+                latest_ver.storage_path = ver_data.get("storage_path")
+                latest_ver.content_sha256 = ver_data["content_sha256"]
 
     await session.commit()
     logger.info("Seeded %d verified Manipur pilot schemes into catalog.", seeded_count)

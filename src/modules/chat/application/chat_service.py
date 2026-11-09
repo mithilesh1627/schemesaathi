@@ -1,5 +1,6 @@
 """Application Orchestrator for Grounded Chat, State Synchronization, and Citations."""
 
+import re
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,6 +36,70 @@ from src.modules.retrieval.domain.models import QueryScript
 from src.modules.retrieval.domain.script_router import ScriptRouter
 
 logger = get_logger(__name__)
+
+
+def format_deterministic_eligibility_block(items: list[EligibilityItemResult]) -> str:
+    """Compose fixed, labelled deterministic eligibility block from engine results."""
+    lines = [
+        "\n\nDeterministic Eligibility Evaluation (AST Engine):",
+    ]
+    for item in items:
+        lines.append(f"- {item.scheme_title} ({item.scheme_id}): {item.status} — {item.reason}")
+    return "\n".join(lines)
+
+
+def verify_no_eligibility_contradictions(
+    prose_text: str,
+    eligibility_results: list[EligibilityItemResult] | None,
+) -> tuple[bool, str | None]:
+    """Server-side guard ensuring LLM free-text prose does not contradict or claim scheme eligibility outcomes."""
+    if not eligibility_results:
+        return True, None
+
+    # 1. Prohibit scheme-status claims tied to scheme IDs in LLM prose
+    # (e.g. "SCH-MN-005: ELIGIBLE", "NOT_ELIGIBLE for SCH-MN-005", "SCH-MN-007 is NOT_ELIGIBLE", etc.)
+    status_claim_pattern = re.compile(
+        r"\b(?:SCH-[A-Z]+-\d+)[^.\n\?!]{0,60}\b(?:NOT_ELIGIBLE|ELIGIBLE|INELIGIBLE)\b|"
+        r"\b(?:NOT_ELIGIBLE|ELIGIBLE|INELIGIBLE)\b[^.\n\?!]{0,60}\b(?:SCH-[A-Z]+-\d+)\b",
+        re.IGNORECASE,
+    )
+    m = status_claim_pattern.search(prose_text)
+    if m:
+        return False, f"LLM prose contains forbidden scheme-status claim: '{m.group(0).strip()}'"
+
+    # 2. Check for direct contradictions with deterministic engine outcomes
+    for item in eligibility_results:
+        sch_id = item.scheme_id
+        sch_title = item.scheme_title
+        status = item.status
+
+        # If scheme is ELIGIBLE, prose must not claim user is ineligible or not eligible for it
+        if status == "ELIGIBLE":
+            inelig_pattern = re.compile(
+                rf"\b(?:not\s+eligible|ineligible)\b[^.\n\?!]{{0,60}}\b(?:{re.escape(sch_id)}|{re.escape(sch_title)})\b|"
+                rf"\b(?:{re.escape(sch_id)}|{re.escape(sch_title)})\b[^.\n\?!]{{0,60}}\b(?:not\s+eligible|ineligible)\b",
+                re.IGNORECASE,
+            )
+            if inelig_pattern.search(prose_text):
+                return (
+                    False,
+                    f"LLM prose claims '{sch_id}' is NOT ELIGIBLE, contradicting deterministic engine",
+                )
+
+        # If scheme is NOT_ELIGIBLE, prose must not claim user is eligible for it
+        elif status == "NOT_ELIGIBLE":
+            elig_pattern = re.compile(
+                rf"(?<!not\s)(?<!in)\beligible\b[^.\n\?!]{{0,60}}\b(?:{re.escape(sch_id)}|{re.escape(sch_title)})\b|"
+                rf"\b(?:{re.escape(sch_id)}|{re.escape(sch_title)})\b[^.\n\?!]{{0,60}}(?<!not\s)(?<!in)\beligible\b",
+                re.IGNORECASE,
+            )
+            if elig_pattern.search(prose_text):
+                return (
+                    False,
+                    f"LLM prose claims '{sch_id}' is ELIGIBLE, contradicting deterministic engine",
+                )
+
+    return True, None
 
 
 class ChatService:
@@ -109,7 +174,6 @@ class ChatService:
             ]
         ) or bool(profile_changes)
 
-        eligibility_eval = None
         structured_eligibility_items: list[EligibilityItemResult] | None = None
 
         if is_eligibility_query:
@@ -136,7 +200,6 @@ class ChatService:
                     batch_resp = await self.evaluator_service.evaluate_student_profile(
                         profile_req, persist_audit=False
                     )
-                    eligibility_eval = batch_resp
                     structured_eligibility_items = [
                         EligibilityItemResult(
                             scheme_id=r.scheme_id,
@@ -222,9 +285,13 @@ class ChatService:
             )
 
         # Step 6: Compose Synchronizer State String
+        # Profile facts are provided as absolute ground truth.
+        # Scheme evaluation outcomes are excluded from the LLM prompt to prevent LLM prose
+        # from copying, stating, or hallucinating scheme statuses. The deterministic AST block
+        # is strictly appended to the answer in Step 9b.
         synchronizer_str = DeterministicStateSynchronizer.serialize_synchronizer_state(
             facts=session.profile_facts,
-            eligibility_eval=eligibility_eval,
+            eligibility_eval=None,
         )
 
         # Step 7: Build Grounded Prompt
@@ -245,12 +312,27 @@ class ChatService:
             detected_script=detected_lang,
         )
 
+        # Server-side guard: Verify no eligibility contradictions or scheme-status claims in LLM prose
+        no_contradictions, guard_reason = verify_no_eligibility_contradictions(
+            raw_answer, structured_eligibility_items
+        )
+        if not no_contradictions:
+            logger.warning(
+                "Server-side guard tripped: %s. Failing closed to standard refusal.",
+                guard_reason,
+            )
+            raw_answer = STANDARD_REFUSAL_MESSAGE
+
         # Step 9: Citation Verification and Grounding Check
         is_valid, final_answer, resolved_citations = CitationEngine.validate_and_resolve_citations(
             answer_text=raw_answer,
             retrieved_chunks=retrieved_chunks,
             is_eligibility_only_turn=is_eligibility_query and not retrieved_chunks,
         )
+
+        # Step 9b: Append Deterministic Eligibility Block if available and not in refusal
+        if structured_eligibility_items and final_answer != STANDARD_REFUSAL_MESSAGE:
+            final_answer += format_deterministic_eligibility_block(structured_eligibility_items)
 
         # Step 10: Update Bounded Session History
         session.add_user_message(clean_message)

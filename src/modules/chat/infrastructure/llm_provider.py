@@ -159,6 +159,7 @@ class DeterministicTestLlmProvider(BaseLlmProvider):
     ) -> str:
         """Generate deterministic, citation-backed response strictly grounded in chunk text."""
         self.last_received_prompt = prompt
+        _ = synchronizer_state_str
         msg_lower = user_message.lower()
 
         # 1. Out-of-corpus guard: Out-of-domain concepts or zero supporting chunks retrieved
@@ -297,6 +298,55 @@ class DeterministicTestLlmProvider(BaseLlmProvider):
             sch_id = extracted_rates["scheme_id"]
             c_tag = f"[^{extracted_rates['cit_num']}]"
 
+            # Check if chunk defines a multi-tier group table (e.g. Group I, II, III, IV)
+            has_multi_group = any(
+                re.search(r"\bgroup\s*-?\s*i\b", str(ch.get("chunk_content", "")), re.IGNORECASE)
+                and re.search(
+                    r"\bgroup\s*-?\s*ii\b", str(ch.get("chunk_content", "")), re.IGNORECASE
+                )
+                for ch in retrieved_chunks
+            )
+
+            if has_multi_group:
+                cit_g1 = extracted_rates["cit_num"]
+                cit_g3 = extracted_rates["cit_num"]
+                for idx, ch in enumerate(retrieved_chunks):
+                    content = str(ch.get("chunk_content", ""))
+                    if "300" in content:
+                        cit_g3 = idx + 1
+                        break
+
+                c_tag_g1 = f"[^{cit_g1}]"
+                c_tag_g3 = f"[^{cit_g3}]"
+
+                if detected_script == LanguageScript.MNI_LATN:
+                    return (
+                        f"Statutory guideline gi matung inna {sch_id} gi maintenance allowance asibu course group gi matung inna thagi (per month) pinaba leiri {c_tag_g1}:\n"
+                        f"- Group I: Day Scholar da ₹550, Hosteller da ₹1,200 {c_tag_g1}\n"
+                        f"- Group II: Day Scholar da ₹530, Hosteller da ₹820 {c_tag_g1}\n"
+                        f"- Group III: Day Scholar da ₹300, Hosteller da ₹570 {c_tag_g3}\n"
+                        f"- Group IV: Day Scholar da ₹230, Hosteller da ₹380 {c_tag_g3}\n"
+                        f"Non-refundable course fees su reimburse toubaga loinana NSP da apply tougani {c_tag_g1}."
+                    )
+                elif detected_script == LanguageScript.MNI_MTEI:
+                    return (
+                        f"ꯑꯣꯐꯤꯁꯤꯑꯦꯜ ꯒꯥꯏꯗꯂꯥꯏꯟ ꯃꯇꯨꯡ ꯏꯟꯅꯥ {sch_id} ꯒꯤ ꯃꯦꯟꯇꯦꯅꯦꯟꯁ ꯑꯦꯂꯥꯎꯟꯁ ꯑꯁꯤ "
+                        f"ꯀꯣꯔꯁ ꯒ꯭ꯔꯨꯄꯀꯤ ꯃꯇꯨꯡ ꯏꯟꯅꯥ ꯊꯥꯒꯤ ꯄꯤ {c_tag_g1}:\n"
+                        f"- Group I: ꯗꯦ ꯁ꯭ꯀꯣꯂꯔ ₹550, ꯍꯣꯁ꯭ꯇꯦꯂꯔ ₹1,200 {c_tag_g1}\n"
+                        f"- Group II: ꯗꯦ ꯁ꯭ꯀꯣꯂꯔ ₹530, ꯍꯣꯁ꯭ꯇꯦꯂꯔ ₹820 {c_tag_g1}\n"
+                        f"- Group III: ꯗꯦ ꯁ꯭ꯀꯣꯂꯔ ₹300, ꯍꯣꯁ꯭ꯇꯦꯂꯔ ₹570 {c_tag_g3}\n"
+                        f"- Group IV: ꯗꯦ ꯁ꯭ꯀꯣꯂꯔ ₹230, ꯍꯣꯁ꯭ꯇꯦꯂꯔ ₹380 {c_tag_g3}꯫"
+                    )
+                return (
+                    f"Under the official guidelines for {sch_id} {c_tag_g1}, the statutory maintenance allowance "
+                    f"varies by course group (per month) {c_tag_g1}:\n"
+                    f"- Group I: ₹550 for Day Scholars, ₹1,200 for Hostellers {c_tag_g1}\n"
+                    f"- Group II: ₹530 for Day Scholars, ₹820 for Hostellers {c_tag_g1}\n"
+                    f"- Group III: ₹300 for Day Scholars, ₹570 for Hostellers {c_tag_g3}\n"
+                    f"- Group IV: ₹230 for Day Scholars, ₹380 for Hostellers {c_tag_g3}\n"
+                    f"Compulsory non-refundable course fees are also reimbursed {c_tag_g1}."
+                )
+
             if detected_script == LanguageScript.MNI_LATN:
                 return (
                     f"Statutory guideline gi matung inna {sch_id} gi maintenance allowance asibu "
@@ -318,53 +368,22 @@ class DeterministicTestLlmProvider(BaseLlmProvider):
         if any(
             e in msg_lower for e in ["eligible", "eligibility", "qualify", "can i apply", "am i"]
         ):
-            eligible_lines: list[str] = []
-            ineligible_lines: list[str] = []
-            unknown_lines: list[str] = []
-
-            for line in synchronizer_state_str.splitlines():
-                if line.startswith("- SCH-"):
-                    item_text = line[2:]
-                    if ": ELIGIBLE" in item_text:
-                        eligible_lines.append(item_text)
-                    elif ": UNKNOWN" in item_text:
-                        unknown_lines.append(item_text)
-                    else:
-                        ineligible_lines.append(item_text)
-
-            summary_parts: list[str] = []
-            if eligible_lines:
-                summary_parts.append("You are ELIGIBLE for: " + "; ".join(eligible_lines))
-            if ineligible_lines:
-                summary_parts.append("You are NOT ELIGIBLE for: " + "; ".join(ineligible_lines))
-            if unknown_lines:
-                summary_parts.append(
-                    f"Eligibility is UNKNOWN for {len(unknown_lines)} schemes due to missing profile facts "
-                    f"(please provide annual family income, social category, and course level to determine eligibility)"
-                )
-
-            if summary_parts:
-                results_summary = " | ".join(summary_parts)
-                if detected_script == LanguageScript.MNI_LATN:
-                    return (
-                        f"Deterministic eligibility engine gi result gi matung inna: {results_summary} [^1]. "
-                        f"Statutory guidelines singgi criteria da income ceiling amasung course level yaori [^1]."
-                    )
-                elif detected_script == LanguageScript.MNI_MTEI:
-                    return (
-                        f"ꯗꯤꯇꯔꯃꯤꯅꯤꯁ꯭ꯇꯤꯛ ꯏꯟꯖꯤꯟ ꯔꯤꯖꯜꯠ ꯃꯇꯨꯡ ꯏꯟꯅꯥ: {results_summary} [^1]꯫ "
-                        f"ꯑꯣꯐꯤꯁꯤꯑꯦꯜ ꯒꯥꯏꯗꯂꯥꯏꯟꯒꯤ ꯄ꯭ꯔꯣꯚꯤꯖꯟ ꯃꯇꯨꯡ ꯏꯟꯅꯥ [^1]꯫"
-                    )
+            c_tag = "[^1]" if retrieved_chunks else ""
+            if detected_script == LanguageScript.MNI_LATN:
                 return (
-                    f"Based on the deterministic eligibility evaluation of your profile facts [^1]: "
-                    f"{results_summary} [^1]. Please review the official guideline criteria and documentation "
-                    f"requirements before submitting [^1]."
+                    f"Deterministic statutory engine gi result gi matung inna profile facts asina eligibility evaluate toure {c_tag}. "
+                    f"Chanbiduna makhada leiba Deterministic Eligibility Evaluation block da scheme khudingmakki status yengbiyu {c_tag}."
                 )
-            else:
+            elif detected_script == LanguageScript.MNI_MTEI:
                 return (
-                    "According to the official statutory eligibility criteria [^1], applicants must "
-                    "satisfy domicile, category, and income ceiling requirements as specified in the guidelines [^1]."
+                    f"ꯗꯤꯇꯔꯃꯤꯅꯤꯁ꯭ꯇꯤꯛ ꯁ꯭ꯇꯦꯆꯨꯇꯔꯤ ꯏꯟꯖꯤꯟꯅꯥ ꯅꯍꯥꯛꯀꯤ ꯄ꯭ꯔꯣꯐꯥꯏꯜ ꯐꯦꯛꯇꯁꯤꯡ ꯁꯤꯖꯤꯟꯅꯗꯨꯅꯥ ꯏꯂꯤꯖꯤꯕꯤꯂꯤꯇꯤ ꯂꯦꯄꯊꯣꯛꯈ꯭ꯔꯦ {c_tag}꯫ "
+                    f"ꯆꯥꯅꯕꯤꯗꯨꯅꯥ ꯃꯈꯥꯗꯥ ꯂꯩꯕꯥ Deterministic Eligibility Evaluation block ꯑꯁꯤꯗꯥ ꯁ꯭ꯀꯤꯃꯁꯤꯡꯒꯤ ꯁ꯭ꯇꯦꯇꯁ ꯌꯦꯡꯕꯤꯌꯨ {c_tag}꯫"
                 )
+            return (
+                f"Based on your verified profile facts and official statutory guidelines {c_tag}, "
+                f"your eligibility has been evaluated by the deterministic statutory engine. "
+                f"Please refer to the Deterministic Eligibility Evaluation block below for your exact status on each scheme {c_tag}."
+            )
 
         # 6. Multilingual general response
         if detected_script == LanguageScript.MNI_LATN:

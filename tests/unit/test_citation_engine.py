@@ -156,3 +156,55 @@ def test_refusal_form_passes_citation_check_cleanly() -> None:
     assert is_valid is True
     assert final_ans == STANDARD_REFUSAL_MESSAGE
     assert len(citations) == 0
+
+
+def test_strengthened_grounding_check_rejects_numeric_claim_whose_sentence_carries_no_citation_marker() -> (
+    None
+):
+    """Verify strengthened numeric grounding check rejects a numeric claim whose sentence carries no citation marker."""
+    retrieved_chunks = [
+        {
+            "chunk_id": "chunk-111",
+            "scheme_id": "SCH-MN-005",
+            "section_title": "Maintenance Allowance",
+            "chunk_content": "Group-I: Hostellers 1200, Day Scholars 550 per month. Group-II: Hostellers 820, Day Scholars 530.",
+            "source_url": "https://scholarships.gov.in/st.pdf",
+            "academic_year": "2024-2025",
+        }
+    ]
+
+    # Case A: Answer has no citation markers anywhere, sentence claims ₹7,000
+    answer_no_cits = "The maintenance allowance is ₹7,000 per month."
+    is_valid_a, reason_a = CitationEngine.verify_numeric_grounding(answer_no_cits, retrieved_chunks)
+    assert is_valid_a is False
+    assert "carries no citation marker" in str(reason_a)
+
+    # Case B: Answer has a citation on line 1, but sentence on line 2 claims ungrounded ₹7,000 without citation marker
+    answer_multi_line = (
+        "[^1] Guidelines for Post-Matric ST.\nThe maintenance allowance is ₹7,000 per month."
+    )
+    is_valid_b, reason_b = CitationEngine.verify_numeric_grounding(
+        answer_multi_line, retrieved_chunks
+    )
+    assert is_valid_b is False
+    assert "7,000" in str(reason_b)
+
+
+def test_strengthened_grounding_check_rejects_unqualified_rate_for_multigroup_scheme() -> None:
+    """Verify that claiming an unqualified single rate for a multi-group scheme is rejected."""
+    retrieved_chunks = [
+        {
+            "chunk_id": "chunk-111",
+            "scheme_id": "SCH-MN-005",
+            "section_title": "Maintenance Allowance Slabs",
+            "chunk_content": "Group-I: 1200 550. Group - II: 820 530. Group - III: 570 300. Group- IV: 380 230 per month.",
+            "source_url": "https://scholarships.gov.in/st.pdf",
+            "academic_year": "2024-2025",
+        }
+    ]
+
+    # Answer asserts ₹300 per month as the unqualified rate without group qualification
+    unqualified_ans = "[^1] According to SCH-MN-005 [^1], the maintenance allowance for Post-Matric ST day scholars is ₹300 per month [^1]."
+    is_valid, reason = CitationEngine.verify_numeric_grounding(unqualified_ans, retrieved_chunks)
+    assert is_valid is False
+    assert "group-qualified" in str(reason).lower()

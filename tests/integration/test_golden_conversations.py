@@ -36,7 +36,9 @@ from src.modules.catalog.domain.models import (
     SchemeVersion,
 )
 from src.modules.catalog.infrastructure.seed_data import seed_pilot_schemes
+from src.modules.chat.application.chat_service import verify_no_eligibility_contradictions
 from src.modules.chat.application.citation_checker import STANDARD_REFUSAL_MESSAGE
+from src.modules.chat.application.schemas import EligibilityItemResult
 from src.modules.chat.domain.enums import LanguageScript
 from src.modules.chat.domain.exceptions import ChatError
 from src.modules.chat.infrastructure.llm_provider import (
@@ -558,3 +560,127 @@ async def test_profile_with_only_domicile_does_not_assume_defaults(
     assert "eligible for: sch-mn-001" not in ans
     assert "eligible for: sch-mn-005" not in ans
     assert "unknown" in ans or "missing" in ans
+
+
+@pytest.mark.asyncio
+async def test_g1_server_side_guard_prevents_eligibility_contradictions_in_prose(
+    async_client: AsyncClient,
+) -> None:
+    """G1 Regression: Engine says SCH-MN-005 ELIGIBLE and SCH-MN-007 NOT_ELIGIBLE (OBC reason).
+
+    Verifies:
+    1. Chat turn produces structured eligibility results where SCH-MN-005 is ELIGIBLE and SCH-MN-007 is NOT_ELIGIBLE (OBC mismatch).
+    2. Answer includes the deterministic AST block listing both outcomes exactly.
+    3. LLM answer prose contains no contradictory claims (e.g. claiming SCH-MN-005 is ineligible or SCH-MN-007 is eligible).
+    4. Server-side guard verify_no_eligibility_contradictions correctly rejects contradictory prose.
+    """
+    session_id = f"test-g1-{uuid.uuid4().hex[:8]}"
+
+    payload = {
+        "session_id": session_id,
+        "message": "Am I eligible for Post-Matric scholarships in Manipur as an ST student?",
+        "profile_updates": {
+            "domicile_state": "MANIPUR",
+            "social_category": "ST",
+            "annual_family_income_inr": 200000.0,
+            "marks_percent": 65.0,
+            "course_level": "UNDERGRADUATE",
+            "is_displaced": False,
+        },
+    }
+
+    resp = await async_client.post("/api/v1/chat/message", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+
+    elig_map = {r["scheme_id"]: r for r in data["eligibility_results"]}
+    assert elig_map["SCH-MN-005"]["status"] == "ELIGIBLE"
+    assert elig_map["SCH-MN-007"]["status"] == "NOT_ELIGIBLE"
+    assert "OBC" in elig_map["SCH-MN-007"]["reason"]
+
+    # 1. Deterministic block must be present and list outcomes exactly
+    ans = data["answer"]
+    assert "Deterministic Eligibility Evaluation (AST Engine):" in ans
+    assert "(SCH-MN-005): ELIGIBLE" in ans
+    assert "(SCH-MN-007): NOT_ELIGIBLE" in ans
+
+    # 2. Prose must not contradict engine outcomes
+    # Strip deterministic block to check prose specifically
+    prose_part = ans.split("Deterministic Eligibility Evaluation (AST Engine):")[0]
+    assert "ineligible for sch-mn-005" not in prose_part.lower()
+    assert "not eligible for sch-mn-005" not in prose_part.lower()
+    assert "eligible for sch-mn-007" not in prose_part.lower()
+
+    # 3. Server-side guard unit test: trips and returns False on contradictory prose
+    mock_items = [
+        EligibilityItemResult(
+            scheme_id="SCH-MN-005",
+            scheme_title="Post-Matric Scholarship for ST Students",
+            status="ELIGIBLE",
+            reason="All criteria met",
+            rule_description="Income within ceiling; ST category verified.",
+            portal_status="OPEN",
+            source_url="https://scholarships.gov.in/st.pdf",
+        ),
+        EligibilityItemResult(
+            scheme_id="SCH-MN-007",
+            scheme_title="Post-Matric Scholarship for OBC Students",
+            status="NOT_ELIGIBLE",
+            reason="Social category 'ST' does not match required categories: OBC",
+            rule_description="Social category 'ST' does not match required categories: OBC",
+            portal_status="OPEN",
+            source_url="https://scholarships.gov.in/obc.pdf",
+        ),
+    ]
+
+    # Contradiction A: claims SCH-MN-007 is eligible
+    ok_a, reason_a = verify_no_eligibility_contradictions(
+        "You are eligible for SCH-MN-007 according to the rules.", mock_items
+    )
+    assert ok_a is False
+    assert "SCH-MN-007" in str(reason_a)
+
+    # Contradiction B: claims SCH-MN-005 is NOT_ELIGIBLE
+    ok_b, reason_b = verify_no_eligibility_contradictions(
+        "You are not eligible for SCH-MN-005 because income is too high.", mock_items
+    )
+    assert ok_b is False
+    assert "SCH-MN-005" in str(reason_b)
+
+    # Contradiction C: scheme-status marker directly in prose
+    ok_c, reason_c = verify_no_eligibility_contradictions(
+        "Status: SCH-MN-005: ELIGIBLE and SCH-MN-007: NOT_ELIGIBLE", mock_items
+    )
+    assert ok_c is False
+    assert "scheme-status claim" in str(reason_c)
+
+
+@pytest.mark.asyncio
+async def test_g2_post_matric_st_allowance_group_qualified_table(
+    async_client: AsyncClient,
+) -> None:
+    """G2 Regression: Allowance question for Post-Matric ST (SCH-MN-005) must produce an answer
+    containing group-qualified rates (including ₹550 and ₹1,200) and must not contain
+    unqualified '₹300 per month' as day-scholar rate.
+    """
+    session_id = f"test-allowance-{uuid.uuid4().hex[:8]}"
+    payload = {
+        "session_id": session_id,
+        "message": "What is the maintenance allowance for Post-Matric ST day scholars?",
+    }
+    resp = await async_client.post("/api/v1/chat/message", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+
+    ans = data["answer"]
+    # Must contain group-qualified rates (including Group I Day Scholar ₹550 and Hosteller ₹1,200)
+    assert "550" in ans
+    assert "1,200" in ans or "1200" in ans
+    assert "Group I" in ans or "Group-I" in ans
+    assert "Group II" in ans or "Group-II" in ans
+    assert "Group III" in ans or "Group-III" in ans
+    assert "Group IV" in ans or "Group-IV" in ans
+
+    # Must NOT contain unqualified ₹300 per month as day-scholar rate
+    assert "₹300 per month for day scholar" not in ans.lower()
+    assert "is ₹300 per month" not in ans.lower()
