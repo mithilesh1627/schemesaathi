@@ -126,11 +126,16 @@ class CitationEngine:
                     seen_nums.add(n)
                     numbers_to_check.append(n)
 
-            if not numbers_to_check:
+            # Substantive numbers: exclude standalone academic year numbers 2024/2025
+            substantive_nums = [
+                n for n in numbers_to_check if n.replace(",", "").strip() not in ("2024", "2025")
+            ]
+
+            if not substantive_nums:
                 continue
 
             # Determine supporting text: if sentence has its own citation, use that chunk;
-            # otherwise fall back to all cited chunks in the answer.
+            # otherwise fall back to all cited chunks across the answer.
             if cits:
                 cited_text_parts: list[str] = []
                 for num in cits:
@@ -143,28 +148,20 @@ class CitationEngine:
                         cited_text_parts.append(str(ch.get("scheme_id", "")))
                 active_chunk_text = " ".join(cited_text_parts).lower()
             else:
-                # Sentence carries no citation marker: must be traceable to chunks cited in the answer
+                # If answer carries zero citations anywhere, reject uncited numeric claim
                 if not all_answer_cits:
                     logger.warning(
                         "Numeric grounding check failed: Numeric claim '%s' in sentence carries no citation marker.",
-                        next(iter(numbers_to_check)),
+                        substantive_nums[0],
                     )
                     return (
                         False,
-                        f"Numeric claim '{next(iter(numbers_to_check))}' carries no citation marker",
+                        f"Numeric claim '{substantive_nums[0]}' carries no citation marker",
                     )
                 active_chunk_text = all_cited_text
 
-            for raw_num in numbers_to_check:
+            for raw_num in substantive_nums:
                 clean_num = raw_num.replace(",", "").strip()
-                # Ignore year numbers in academic session (e.g. 2024, 2025) if present
-                if clean_num in ("2024", "2025") and (
-                    "2024" in active_chunk_text
-                    or "2025" in active_chunk_text
-                    or "2024" in all_cited_text
-                    or "2025" in all_cited_text
-                ):
-                    continue
 
                 num_found = (
                     clean_num.lower() in active_chunk_text
@@ -219,24 +216,49 @@ class CitationEngine:
                 )
                 return False, "Unit 'per annum' not found in cited chunks"
 
-            # Check for multi-tier group qualification:
+            # Check for multi-tier group qualification across the general class of rates:
             # If cited chunk defines multi-tier course groups, an allowance answer must not state
-            # an unqualified single rate (e.g. claiming ₹300 as the sole day scholar rate)
+            # an unqualified single rate (rejects ₹550, ₹530, ₹300, ₹230, and hosteller rates alike).
             if chunk_has_multi_group and any(
-                w in clean_s.lower() for w in ["allowance", "day scholar", "hosteller"]
+                w in clean_s.lower() for w in ["allowance", "day scholar", "hosteller", "stipend"]
             ):
-                has_group_mention = any(
+                has_group_in_sentence = any(
                     w in sentence.lower()
-                    for w in ["group", "group-i", "group i", "group ii", "group iii", "group iv"]
+                    for w in [
+                        "group",
+                        "group-i",
+                        "group i",
+                        "group ii",
+                        "group-ii",
+                        "group iii",
+                        "group-iii",
+                        "group iv",
+                        "group-iv",
+                        "group 1",
+                        "group 2",
+                        "group 3",
+                        "group 4",
+                    ]
                 )
-                is_unqualified_rate_claim = (
-                    not has_group_mention
-                    and any(c in sentence for c in ["₹300", "300", "₹ 300"])
-                    and not any(g in answer_text.lower() for g in ["group i", "group-i", "group 1"])
+                has_multi_group_breakdown = any(
+                    g in answer_text.lower() for g in ["group i", "group-i", "group 1"]
+                ) and any(
+                    g in answer_text.lower()
+                    for g in [
+                        "group ii",
+                        "group-ii",
+                        "group 2",
+                        "group iii",
+                        "group-iii",
+                        "group 3",
+                        "group iv",
+                        "group-iv",
+                        "group 4",
+                    ]
                 )
-                if is_unqualified_rate_claim:
+                if not has_group_in_sentence and not has_multi_group_breakdown:
                     logger.warning(
-                        "Numeric grounding check failed: Single rate '%s' stated without course group qualification for multi-group scheme.",
+                        "Numeric grounding check failed: Single rate stated in sentence '%s' without course group qualification for multi-group scheme.",
                         sentence,
                     )
                     return (

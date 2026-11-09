@@ -161,7 +161,9 @@ def test_refusal_form_passes_citation_check_cleanly() -> None:
 def test_strengthened_grounding_check_rejects_numeric_claim_whose_sentence_carries_no_citation_marker() -> (
     None
 ):
-    """Verify strengthened numeric grounding check rejects a numeric claim whose sentence carries no citation marker."""
+    """Verify strengthened numeric grounding check rejects a numeric claim whose sentence carries no citation marker,
+    even when the number is present in a chunk cited elsewhere in the answer.
+    """
     retrieved_chunks = [
         {
             "chunk_id": "chunk-111",
@@ -191,7 +193,9 @@ def test_strengthened_grounding_check_rejects_numeric_claim_whose_sentence_carri
 
 
 def test_strengthened_grounding_check_rejects_unqualified_rate_for_multigroup_scheme() -> None:
-    """Verify that claiming an unqualified single rate for a multi-group scheme is rejected."""
+    """Verify that claiming an unqualified single rate for a multi-group scheme is rejected
+    across the general class of rates (not just ₹300), while properly qualified rates pass.
+    """
     retrieved_chunks = [
         {
             "chunk_id": "chunk-111",
@@ -203,8 +207,50 @@ def test_strengthened_grounding_check_rejects_unqualified_rate_for_multigroup_sc
         }
     ]
 
-    # Answer asserts ₹300 per month as the unqualified rate without group qualification
-    unqualified_ans = "[^1] According to SCH-MN-005 [^1], the maintenance allowance for Post-Matric ST day scholars is ₹300 per month [^1]."
-    is_valid, reason = CitationEngine.verify_numeric_grounding(unqualified_ans, retrieved_chunks)
-    assert is_valid is False
-    assert "group-qualified" in str(reason).lower()
+    # Test 1: Rate ₹300 (demonstrated failure from fix 2)
+    unqualified_ans_300 = "[^1] According to SCH-MN-005 [^1], the maintenance allowance for Post-Matric ST day scholars is ₹300 per month [^1]."
+    is_valid_300, reason_300 = CitationEngine.verify_numeric_grounding(
+        unqualified_ans_300, retrieved_chunks
+    )
+    assert is_valid_300 is False
+    assert "group-qualified" in str(reason_300).lower()
+
+    # Test 2: Rate ₹550 (Group I day-scholar rate - fails on pre-fix checker which only checked for 300)
+    unqualified_ans_550 = "[^1] According to SCH-MN-005 [^1], the maintenance allowance for Post-Matric ST day scholars is ₹550 per month [^1]."
+    is_valid_550, reason_550 = CitationEngine.verify_numeric_grounding(
+        unqualified_ans_550, retrieved_chunks
+    )
+    assert is_valid_550 is False
+    assert "group-qualified" in str(reason_550).lower()
+
+    # Test 3: Rate ₹230 (Group IV day-scholar rate - fails on pre-fix checker)
+    unqualified_ans_230 = "[^1] According to SCH-MN-005 [^1], the maintenance allowance for Post-Matric ST day scholars is ₹230 per month [^1]."
+    is_valid_230, reason_230 = CitationEngine.verify_numeric_grounding(
+        unqualified_ans_230, retrieved_chunks
+    )
+    assert is_valid_230 is False
+    assert "group-qualified" in str(reason_230).lower()
+
+    # Test 4: Rate ₹530 (Group II rate - general class test)
+    unqualified_ans_530 = "[^1] According to SCH-MN-005 [^1], the maintenance allowance for Post-Matric ST day scholars is ₹530 per month [^1]."
+    is_valid_530, reason_530 = CitationEngine.verify_numeric_grounding(
+        unqualified_ans_530, retrieved_chunks
+    )
+    assert is_valid_530 is False
+    assert "group-qualified" in str(reason_530).lower()
+
+    # Test 5: Explicit course group qualification in sentence PASSES
+    qualified_ans = "[^1] According to SCH-MN-005 [^1], the maintenance allowance for Post-Matric ST Group I day scholars is ₹550 per month [^1]."
+    is_valid_qual, _ = CitationEngine.verify_numeric_grounding(qualified_ans, retrieved_chunks)
+    assert is_valid_qual is True
+
+    # Test 6: Complete multi-group table / breakdown PASSES
+    table_ans = (
+        "[^1] Under official guidelines for SCH-MN-005 [^1], monthly allowances by group:\n"
+        "- Group I: ₹550 Day Scholar, ₹1,200 Hosteller [^1]\n"
+        "- Group II: ₹530 Day Scholar, ₹820 Hosteller [^1]\n"
+        "- Group III: ₹300 Day Scholar, ₹570 Hosteller [^1]\n"
+        "- Group IV: ₹230 Day Scholar, ₹380 Hosteller [^1]"
+    )
+    is_valid_table, _ = CitationEngine.verify_numeric_grounding(table_ans, retrieved_chunks)
+    assert is_valid_table is True

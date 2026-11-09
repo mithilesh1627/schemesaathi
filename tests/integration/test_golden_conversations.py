@@ -42,6 +42,7 @@ from src.modules.chat.application.schemas import EligibilityItemResult
 from src.modules.chat.domain.enums import LanguageScript
 from src.modules.chat.domain.exceptions import ChatError
 from src.modules.chat.infrastructure.llm_provider import (
+    DeterministicTestLlmProvider,
     OllamaLlmProvider,
     get_llm_provider,
 )
@@ -238,7 +239,7 @@ async def test_golden_conversation_6_multilingual_meiteilon_and_meetei_mayek(
     assert resp_latn.status_code == 200
     d_latn = resp_latn.json()
     assert d_latn["detected_language"] == "Romanized Meiteilon"
-    assert "[^1]" in d_latn["answer"] or "[^2]" in d_latn["answer"]
+    assert any(c in d_latn["answer"] for c in ["[^1]", "[^2]", "[^3]"])
     assert "550" in d_latn["answer"]
     assert "1,200" in d_latn["answer"] or "1200" in d_latn["answer"]
     assert "month" in d_latn["answer"].lower()
@@ -256,7 +257,7 @@ async def test_golden_conversation_6_multilingual_meiteilon_and_meetei_mayek(
     assert resp_mtei.status_code == 200
     d_mtei = resp_mtei.json()
     assert d_mtei["detected_language"] == "Meetei Mayek"
-    assert "[^1]" in d_mtei["answer"] or "[^2]" in d_mtei["answer"]
+    assert any(c in d_mtei["answer"] for c in ["[^1]", "[^2]", "[^3]"])
     assert "550" in d_mtei["answer"]
     assert "1,200" in d_mtei["answer"] or "1200" in d_mtei["answer"]
     assert "7,000" not in d_mtei["answer"]
@@ -684,3 +685,50 @@ async def test_g2_post_matric_st_allowance_group_qualified_table(
     # Must NOT contain unqualified ₹300 per month as day-scholar rate
     assert "₹300 per month for day scholar" not in ans.lower()
     assert "is ₹300 per month" not in ans.lower()
+
+
+def test_r1_stub_derives_group_allowance_table_from_chunk_and_fails_when_chunk_changes() -> None:
+    """R1 Evidence: Test stub derives allowance table dynamically from chunk text.
+    Demonstrates that the test passes by derivation, and fails if the chunk's rates are changed.
+    """
+    provider = DeterministicTestLlmProvider()
+
+    # Modified chunk rates: Group I is changed to ₹950 (day scholar) / ₹1,800 (hosteller)
+    # instead of the standard ₹550 / ₹1,200
+    modified_chunks = [
+        {
+            "chunk_id": "chunk-test-mod",
+            "scheme_id": "SCH-MN-005",
+            "section_title": "Maintenance Allowance Slabs",
+            "chunk_content": (
+                "| Group | Course Description | Hostellers (₹/Month) | Day Scholars (₹/Month) |\n"
+                "| --- | --- | --- | --- |\n"
+                "| Group-I | Degree Professional | 1800 | 950 |\n"
+                "| Group-II | Diplomas | 1100 | 750 |\n"
+                "| Group-III | General Degree | 850 | 450 |\n"
+                "| Group-IV | Class 11-12 | 500 | 320 |"
+            ),
+            "source_url": "https://scholarships.gov.in/st.pdf",
+            "academic_year": "2024-2025",
+        }
+    ]
+
+    resp = provider.generate(
+        prompt="What is the maintenance allowance for Post-Matric ST day scholars?",
+        retrieved_chunks=modified_chunks,
+        synchronizer_state_str="",
+        user_message="What is the maintenance allowance for Post-Matric ST day scholars?",
+        detected_script=LanguageScript.ENGLISH,
+    )
+
+    # Derived dynamically from modified chunk:
+    assert "950" in resp
+    assert "1,800" in resp or "1800" in resp
+    assert "750" in resp
+    assert "450" in resp
+    assert "320" in resp
+
+    # Proves old standard rates (550, 1,200, 300) are NOT output:
+    assert "₹550" not in resp
+    assert "₹1,200" not in resp
+    assert "₹300" not in resp

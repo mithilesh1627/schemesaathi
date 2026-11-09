@@ -257,21 +257,106 @@ class DeterministicTestLlmProvider(BaseLlmProvider):
                 "kaya",
             ]
         ):
-            # Extract authentic allowance values from retrieved chunks (never from a template)
+            # 1. Parse multi-group allowance rates dynamically from retrieved chunks
+            parsed_groups: list[dict[str, Any]] = []
+            seen_groups: set[str] = set()
+            multi_group_sch_id = "the scheme"
+
+            for idx, ch in enumerate(retrieved_chunks):
+                content = str(ch.get("chunk_content", ""))
+                cit_marker = f"[^{idx + 1}]"
+                s_id = ch.get("scheme_id", "the scheme")
+
+                # Table pattern: | Group-I | ... | 1200 | 550 |
+                t_matches = list(
+                    re.finditer(
+                        r"\|\s*Group[-\s]*([I|V|X\d]+)[^|]*\|\s*(?:[^|]*\|)?\s*([0-9,]+)\s*\|\s*([0-9,]+)\s*\|",
+                        content,
+                        re.IGNORECASE,
+                    )
+                )
+                if t_matches:
+                    multi_group_sch_id = s_id
+                    for tm in t_matches:
+                        grp = tm.group(1).upper()
+                        if grp not in seen_groups:
+                            seen_groups.add(grp)
+                            v1 = int(tm.group(2).replace(",", ""))
+                            v2 = int(tm.group(3).replace(",", ""))
+                            parsed_groups.append(
+                                {
+                                    "group": f"Group {grp}",
+                                    "day_scholar": f"{min(v1, v2):,}",
+                                    "hosteller": f"{max(v1, v2):,}",
+                                    "cit_marker": cit_marker,
+                                }
+                            )
+
+                # Text pattern: Group-I: 1200 550 or Group-I: Hostellers 1200, Day Scholars 550
+                txt_matches = list(
+                    re.finditer(
+                        r"Group[-\s]*([I|V|X\d]+)[^0-9\n]*?(?:Hostellers?[^0-9\n]*)?([0-9,]+)[^0-9\n]+?(?:Day\s+Scholars?[^0-9\n]*)?([0-9,]+)",
+                        content,
+                        re.IGNORECASE,
+                    )
+                )
+                if txt_matches:
+                    multi_group_sch_id = s_id
+                    for tm in txt_matches:
+                        grp = tm.group(1).upper()
+                        if grp not in seen_groups:
+                            seen_groups.add(grp)
+                            v1 = int(tm.group(2).replace(",", ""))
+                            v2 = int(tm.group(3).replace(",", ""))
+                            parsed_groups.append(
+                                {
+                                    "group": f"Group {grp}",
+                                    "day_scholar": f"{min(v1, v2):,}",
+                                    "hosteller": f"{max(v1, v2):,}",
+                                    "cit_marker": cit_marker,
+                                }
+                            )
+
+            if len(parsed_groups) >= 2:
+                first_cit = parsed_groups[0]["cit_marker"]
+                if detected_script == LanguageScript.MNI_LATN:
+                    lines = [
+                        f"Statutory guideline gi matung inna {multi_group_sch_id} gi maintenance allowance asibu course group gi matung inna thagi (per month) pinaba leiri {first_cit}:"
+                    ]
+                    for g in parsed_groups:
+                        lines.append(
+                            f"- {g['group']}: Day Scholar da ₹{g['day_scholar']}, Hosteller da ₹{g['hosteller']} {g['cit_marker']}"
+                        )
+                    lines.append(
+                        f"Non-refundable course fees su reimburse toubaga loinana NSP da apply tougani {first_cit}."
+                    )
+                    return "\n".join(lines)
+                elif detected_script == LanguageScript.MNI_MTEI:
+                    lines = [
+                        f"ꯑꯣꯐꯤꯁꯤꯑꯦꯜ ꯒꯥꯏꯗꯂꯥꯏꯟ ꯃꯇꯨꯡ ꯏꯟꯅꯥ {multi_group_sch_id} ꯒꯤ ꯃꯦꯟꯇꯦꯅꯦꯟꯁ ꯑꯦꯂꯥꯎꯟꯁ ꯑꯁꯤ ꯀꯣꯔꯁ ꯒ꯭ꯔꯨꯄꯀꯤ ꯃꯇꯨꯡ ꯏꯟꯅꯥ ꯊꯥꯒꯤ ꯄꯤ {first_cit}:"
+                    ]
+                    for g in parsed_groups:
+                        lines.append(
+                            f"- {g['group']}: ꯗꯦ ꯁ꯭ꯀꯣꯂꯔ ₹{g['day_scholar']}, ꯍꯣꯁ꯭ꯇꯦꯂꯔ ₹{g['hosteller']} {g['cit_marker']}"
+                        )
+                    return "\n".join(lines) + "꯫"
+
+                lines = [
+                    f"Under the official guidelines for {multi_group_sch_id} {first_cit}, the statutory maintenance allowance varies by course group (per month) {first_cit}:"
+                ]
+                for g in parsed_groups:
+                    lines.append(
+                        f"- {g['group']}: ₹{g['day_scholar']} for Day Scholars, ₹{g['hosteller']} for Hostellers {g['cit_marker']}"
+                    )
+                lines.append(
+                    f"Compulsory non-refundable course fees are also reimbursed {first_cit}."
+                )
+                return "\n".join(lines)
+
+            # 2. Single-rate / non-tiered allowance extraction
             extracted_rates: dict[str, Any] | None = None
             for idx, ch in enumerate(retrieved_chunks):
-                content = ch.get("chunk_content", "")
-                # ST Post-Matric monthly rates: Group-I: 1200 hosteller, 550 day scholar
-                if ("1200" in content or "1,200" in content) and "550" in content:
-                    extracted_rates = {
-                        "scheme_id": ch.get("scheme_id", "SCH-MN-005"),
-                        "day_scholar": "550",
-                        "hosteller": "1,200",
-                        "unit": "per month",
-                        "cit_num": idx + 1,
-                    }
-                    break
-                # General regex extraction for day scholar / hosteller allowances from chunk text
+                content = str(ch.get("chunk_content", ""))
                 m_ds = re.search(r"day\s+scholars?[^0-9]*([0-9,]+)", content, re.IGNORECASE)
                 m_h = re.search(r"hostellers?[^0-9]*([0-9,]+)", content, re.IGNORECASE)
                 if m_ds and m_h:
@@ -285,7 +370,6 @@ class DeterministicTestLlmProvider(BaseLlmProvider):
                     }
                     break
 
-            # If the retrieved chunk does not contain the asked-for allowance, refuse plainly
             if not extracted_rates:
                 logger.info(
                     "DeterministicTestLlmProvider: Retrieved chunks lack asked-for allowance values. Refusing."
@@ -297,55 +381,6 @@ class DeterministicTestLlmProvider(BaseLlmProvider):
             unit_str = extracted_rates["unit"]
             sch_id = extracted_rates["scheme_id"]
             c_tag = f"[^{extracted_rates['cit_num']}]"
-
-            # Check if chunk defines a multi-tier group table (e.g. Group I, II, III, IV)
-            has_multi_group = any(
-                re.search(r"\bgroup\s*-?\s*i\b", str(ch.get("chunk_content", "")), re.IGNORECASE)
-                and re.search(
-                    r"\bgroup\s*-?\s*ii\b", str(ch.get("chunk_content", "")), re.IGNORECASE
-                )
-                for ch in retrieved_chunks
-            )
-
-            if has_multi_group:
-                cit_g1 = extracted_rates["cit_num"]
-                cit_g3 = extracted_rates["cit_num"]
-                for idx, ch in enumerate(retrieved_chunks):
-                    content = str(ch.get("chunk_content", ""))
-                    if "300" in content:
-                        cit_g3 = idx + 1
-                        break
-
-                c_tag_g1 = f"[^{cit_g1}]"
-                c_tag_g3 = f"[^{cit_g3}]"
-
-                if detected_script == LanguageScript.MNI_LATN:
-                    return (
-                        f"Statutory guideline gi matung inna {sch_id} gi maintenance allowance asibu course group gi matung inna thagi (per month) pinaba leiri {c_tag_g1}:\n"
-                        f"- Group I: Day Scholar da ₹550, Hosteller da ₹1,200 {c_tag_g1}\n"
-                        f"- Group II: Day Scholar da ₹530, Hosteller da ₹820 {c_tag_g1}\n"
-                        f"- Group III: Day Scholar da ₹300, Hosteller da ₹570 {c_tag_g3}\n"
-                        f"- Group IV: Day Scholar da ₹230, Hosteller da ₹380 {c_tag_g3}\n"
-                        f"Non-refundable course fees su reimburse toubaga loinana NSP da apply tougani {c_tag_g1}."
-                    )
-                elif detected_script == LanguageScript.MNI_MTEI:
-                    return (
-                        f"ꯑꯣꯐꯤꯁꯤꯑꯦꯜ ꯒꯥꯏꯗꯂꯥꯏꯟ ꯃꯇꯨꯡ ꯏꯟꯅꯥ {sch_id} ꯒꯤ ꯃꯦꯟꯇꯦꯅꯦꯟꯁ ꯑꯦꯂꯥꯎꯟꯁ ꯑꯁꯤ "
-                        f"ꯀꯣꯔꯁ ꯒ꯭ꯔꯨꯄꯀꯤ ꯃꯇꯨꯡ ꯏꯟꯅꯥ ꯊꯥꯒꯤ ꯄꯤ {c_tag_g1}:\n"
-                        f"- Group I: ꯗꯦ ꯁ꯭ꯀꯣꯂꯔ ₹550, ꯍꯣꯁ꯭ꯇꯦꯂꯔ ₹1,200 {c_tag_g1}\n"
-                        f"- Group II: ꯗꯦ ꯁ꯭ꯀꯣꯂꯔ ₹530, ꯍꯣꯁ꯭ꯇꯦꯂꯔ ₹820 {c_tag_g1}\n"
-                        f"- Group III: ꯗꯦ ꯁ꯭ꯀꯣꯂꯔ ₹300, ꯍꯣꯁ꯭ꯇꯦꯂꯔ ₹570 {c_tag_g3}\n"
-                        f"- Group IV: ꯗꯦ ꯁ꯭ꯀꯣꯂꯔ ₹230, ꯍꯣꯁ꯭ꯇꯦꯂꯔ ₹380 {c_tag_g3}꯫"
-                    )
-                return (
-                    f"Under the official guidelines for {sch_id} {c_tag_g1}, the statutory maintenance allowance "
-                    f"varies by course group (per month) {c_tag_g1}:\n"
-                    f"- Group I: ₹550 for Day Scholars, ₹1,200 for Hostellers {c_tag_g1}\n"
-                    f"- Group II: ₹530 for Day Scholars, ₹820 for Hostellers {c_tag_g1}\n"
-                    f"- Group III: ₹300 for Day Scholars, ₹570 for Hostellers {c_tag_g3}\n"
-                    f"- Group IV: ₹230 for Day Scholars, ₹380 for Hostellers {c_tag_g3}\n"
-                    f"Compulsory non-refundable course fees are also reimbursed {c_tag_g1}."
-                )
 
             if detected_script == LanguageScript.MNI_LATN:
                 return (
