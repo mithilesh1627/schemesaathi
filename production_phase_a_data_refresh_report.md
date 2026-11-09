@@ -138,11 +138,15 @@ Get-FileHash -Algorithm SHA256 data\storage\documents\* | Format-Table -Property
 1. **Evaluator Derivation on Every Return Path:**
    Extracted helper function `_derive_window_info(window)` in `scheme_evaluator.py`:
    ```python
-   def _derive_window_info(window: SchemeApplicationWindow | None) -> tuple[str, str | None, str | None, str | None, RuleOutcome, str]:
+   def _derive_window_info(
+       window: SchemeApplicationWindow | None,
+   ) -> tuple[str, str | None, str | None, str | None, RuleOutcome, str]:
        today = date.today()
        portal_type_val = window.portal_type.value if window else None
        portal_status_val = window.portal_status.value if window else None
-       window_close_val = str(window.window_close_date) if window and window.window_close_date else None
+       window_close_val = (
+           str(window.window_close_date) if window and window.window_close_date else None
+       )
 
        if window and window.window_open_date is not None and window.window_close_date is not None:
            if window.window_open_date <= today <= window.window_close_date:
@@ -151,14 +155,23 @@ Get-FileHash -Algorithm SHA256 data\storage\documents\* | Format-Table -Property
                w_outcome = RuleOutcome.PASS
            else:
                derived_window_status = "CLOSED"
-               w_diag = f"Application window is CLOSED (closed on: {window_close_val or 'Unspecified'})."
+               w_diag = (
+                   f"Application window is CLOSED (closed on: {window_close_val or 'Unspecified'})."
+               )
                w_outcome = RuleOutcome.FAIL
        else:
            derived_window_status = "CLOSED"
            w_diag = f"Application window is CLOSED (closed on: {window_close_val or 'Unspecified'})."
            w_outcome = RuleOutcome.FAIL
 
-       return derived_window_status, portal_type_val, portal_status_val, window_close_val, w_outcome, w_diag
+       return (
+           derived_window_status,
+           portal_type_val,
+           portal_status_val,
+           window_close_val,
+           w_outcome,
+           w_diag,
+       )
    ```
    - On the early-return path where `verification_status != OFFICIAL_VERIFIED`, the evaluator now invokes `_derive_window_info(latest_version.application_window)`. If dates are active, `window_status` is `"OPEN"`, `status_label` is `"Conditionally eligible / information missing"`, and diagnostic outcome is `RuleOutcome.PASS`.
    - On the main return path, the `"Application Window Status"` diagnostic clause now carries `outcome: RuleOutcome.FAIL` when closed and `RuleOutcome.PASS` when open.
@@ -414,7 +427,14 @@ def _derive_window_info(
         w_diag = f"Application window is CLOSED (closed on: {window_close_val or 'Unspecified'})."
         w_outcome = RuleOutcome.FAIL
 
-    return derived_window_status, portal_type_val, portal_status_val, window_close_val, w_outcome, w_diag
+    return (
+        derived_window_status,
+        portal_type_val,
+        portal_status_val,
+        window_close_val,
+        w_outcome,
+        w_diag,
+    )
 ```
 
 ### Worked JSON Example 1: Rule-Eligible Student on Closed Scheme (`SCH-MN-005`)
