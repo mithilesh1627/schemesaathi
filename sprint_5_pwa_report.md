@@ -5,7 +5,7 @@
 **Date:** 2026-11-09  
 **Repository:** `mithilesh1627/schemesaathi`  
 **Baseline Head:** `5a879db` (Sprint 5 Fix-2 Commit)  
-**Verified Remediation Head:** `857628c` (CI run `42554208606`, both jobs green)  
+**Verified Remediation Head:** `457403a` (CI run `42604226594`, both jobs green)  
 **Baseline Observed Test Count:** 190 passed, 8 skipped locally (198 collected)  
 **Sprint 5 Residuals Verified Test Count:** 191 passed, 8 skipped locally (199 collected; 199 passed in CI)  
 
@@ -34,7 +34,7 @@
   - Corrected report claim to honestly describe checker capabilities and limitations.
 - **R3 — Report §9, §10, and §5 Header Alignment (`sprint_5_pwa_report.md`):**
   - Updated §9 with the actual observed test run: **191 passed, 8 skipped locally (199 collected)** in 249.15s with 90% coverage.
-  - Updated §10 with verified GitHub Actions green runs: run `42554208606` (commit `857628c`), run `42555021349` (commit `f26d718`), plus new run for this task.
+  - Updated §10 with verified GitHub Actions green runs: run `42604226594` (commit `457403a`, 199 passed), run `42555021349` (commit `f26d718`), and run `42554208606` (commit `857628c`).
   - Corrected §5 date line from `2026-11-08` to `2026-11-09`.
 
 #### Observed Test Counts
@@ -71,7 +71,7 @@
 #### R3 Evidence — Report Synchronization
 - §5 Date Line: Corrected to `2026-11-09`.
 - §9 Test Output: Updated with full verbatim run output (191 passed, 8 skipped locally, 199 collected).
-- §10 CI Runs: Updated with verified run `42554208606` and run `42555021349`.
+- §10 CI Runs: Updated with verified green runs `42604226594` (commit `457403a`), `42555021349` (commit `f26d718`), and `42554208606` (commit `857628c`).
 
 ---
 
@@ -618,11 +618,14 @@ tests\unit\test_citation_engine.py::test_strengthened_grounding_check_rejects_un
   Success: no issues found in 91 source files
   ```
 - **GitHub Actions Verified Green Runs:**
-  - Run URL: [`https://github.com/mithilesh1627/schemesaathi/actions/runs/42554208606`](https://github.com/mithilesh1627/schemesaathi/actions/runs/42554208606)
-    - Target Commit: `857628c` on `main`
-    - Jobs: `Code Quality`: **SUCCESS**, `Automated Tests`: **SUCCESS** (198 passed)
+  - Run URL: [`https://github.com/mithilesh1627/schemesaathi/actions/runs/42604226594`](https://github.com/mithilesh1627/schemesaathi/actions/runs/42604226594)
+    - Target Commit: `457403a` on `main`
+    - Jobs: `Code Quality`: **SUCCESS**, `Automated Tests`: **SUCCESS** (199 passed)
   - Run URL: [`https://github.com/mithilesh1627/schemesaathi/actions/runs/42555021349`](https://github.com/mithilesh1627/schemesaathi/actions/runs/42555021349)
     - Target Commit: `f26d718` on `main`
+    - Jobs: `Code Quality`: **SUCCESS**, `Automated Tests`: **SUCCESS** (198 passed)
+  - Run URL: [`https://github.com/mithilesh1627/schemesaathi/actions/runs/42554208606`](https://github.com/mithilesh1627/schemesaathi/actions/runs/42554208606)
+    - Target Commit: `857628c` on `main`
     - Jobs: `Code Quality`: **SUCCESS**, `Automated Tests`: **SUCCESS** (198 passed)
 
 ---
