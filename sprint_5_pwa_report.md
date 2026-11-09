@@ -5,9 +5,9 @@
 **Date:** 2026-11-09  
 **Repository:** `mithilesh1627/schemesaathi`  
 **Baseline Head:** `5a879db` (Sprint 5 Fix-2 Commit)  
-**Verified Remediation Head:** `5a879db` -> current commit  
+**Verified Remediation Head:** `857628c` (CI run `42554208606`, both jobs green)  
 **Baseline Observed Test Count:** 186 passed, 8 skipped locally (194 collected)  
-**Sprint 5 Fix 3 Verified Test Count:** 188 passed, 8 skipped locally (196 collected)  
+**Sprint 5 Fix 3 Verified Test Count:** 190 passed, 8 skipped locally (198 collected; 198 passed in CI run 42554208606)  
 
 ---
 
