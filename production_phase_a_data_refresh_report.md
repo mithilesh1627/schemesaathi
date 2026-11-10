@@ -638,10 +638,15 @@ SKIPPED [1] tests\integration\test_postgres_retrieval_integration.py:177: Postgr
 ============ 196 passed, 8 skipped, 1 warning in 184.44s (0:03:04) ============
 ```
 
-### Static Analysis Checks
-- **Ruff Lint:** `ruff check src tests` -> `All checks passed!`
-- **Ruff Format:** `ruff format --check src tests` -> `91 files already formatted`
-- **Mypy Type Check:** `mypy src tests` -> `Success: no issues found in 91 source files`
+### Static Analysis & CI Pipeline Verification
+- **GitHub Actions Run ID:** [42741839197](https://github.com/mithilesh1627/schemesaathi/actions/runs/42741839197)
+- **Commit:** `f1ba853` (`fix(tests): align postgres dynamic window test with CMCSRS None window close date`)
+- **Job 1 (Code Quality):** `completed / success` (Ruff lint, Ruff format check, Mypy strict typing).
+- **Job 2 (Automated Unit & Integration Tests):** `completed / success` (All 204 items passed against live PostgreSQL 16 + pgvector container and Redis cluster; 90% code coverage).
+- **Local Checks:**
+  - `ruff check .` -> `All checks passed!`
+  - `ruff format --check .` -> `120 files already formatted`
+  - `mypy src tests` -> `Success: no issues found in 91 source files`
 
 ---
 
