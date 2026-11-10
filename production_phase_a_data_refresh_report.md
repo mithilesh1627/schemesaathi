@@ -639,9 +639,9 @@ SKIPPED [1] tests\integration\test_postgres_retrieval_integration.py:177: Postgr
 ```
 
 ### Static Analysis & CI Pipeline Verification
-- **GitHub Actions Run ID:** [42741839197](https://github.com/mithilesh1627/schemesaathi/actions/runs/42741839197)
-- **Commit:** `f1ba853` (`fix(tests): align postgres dynamic window test with CMCSRS None window close date`)
-- **Job 1 (Code Quality):** `completed / success` (Ruff lint, Ruff format check, Mypy strict typing).
+- **GitHub Actions Run ID:** [42743168818](https://github.com/mithilesh1627/schemesaathi/actions/runs/42743168818)
+- **Commit:** `1a4357c` (`docs(phase-a): record verified green CI run in Phase A report`)
+- **Job 1 (Code Quality):** `completed / success` (Ruff lint, Ruff format check, Mypy strict typing across 91 source files).
 - **Job 2 (Automated Unit & Integration Tests):** `completed / success` (All 204 items passed against live PostgreSQL 16 + pgvector container and Redis cluster; 90% code coverage).
 - **Local Checks:**
   - `ruff check .` -> `All checks passed!`
