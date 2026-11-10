@@ -163,15 +163,25 @@ async def test_dynamic_window_closed_provenance(pg_session: AsyncSession) -> Non
     chunks = await repo.get_all_chunks()
     assert len(chunks) > 0
 
-    test_candidates = [{"chunk": chunks[0], "sparse_rank": 1, "dense_rank": 1, "rrf_score": 0.05}]
+    # 1. Scheme with authentic statutory window close date (SCH-MN-005)
+    nsp_chunk = next(c for c in chunks if c.scheme_id == "SCH-MN-005")
+    test_candidates = [{"chunk": nsp_chunk, "sparse_rank": 1, "dense_rank": 1, "rrf_score": 0.05}]
     provenance = await repo.attach_provenance(test_candidates)
     assert len(provenance) == 1
 
     candidate = provenance[0]
-    # For 2024-2025 pilot schemes, window closed in 2024/early 2025
+    # For AY 2025-2026 NSP schemes, window closed on 2025-10-31 (in the past relative to today)
     assert candidate.window_close_date is not None
     assert candidate.window_close_date < date.today()
     assert candidate.is_window_closed is True
+
+    # 2. Scheme with missing window dates (SCH-MN-003) defaults safely to closed
+    cmcsrs_chunk = next((c for c in chunks if c.scheme_id == "SCH-MN-003"), None)
+    if cmcsrs_chunk:
+        prov_cmcsrs = await repo.attach_provenance([{"chunk": cmcsrs_chunk}])
+        assert len(prov_cmcsrs) == 1
+        assert prov_cmcsrs[0].window_close_date is None
+        assert prov_cmcsrs[0].is_window_closed is True
 
 
 @pytest.mark.asyncio
